@@ -1,0 +1,19 @@
+{
+  "name": "tuor",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "tuor": "src/main.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@earendil-works/gondolin": "^0.6.0"
+  }
+}
