@@ -14,7 +14,7 @@ if (!configDir) {
 
 const raw = JSON.parse(readFileSync(join(configDir, "config.json"), "utf-8"));
 const config = parseConfig(raw);
-const imageTag = await resolveImage(config.image, configDir, config);
+const imageTag = await resolveImage(config.rootfs, configDir);
 
 const vm = await VM.create({
   sandbox: { imagePath: imageTag },

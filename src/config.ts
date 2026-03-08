@@ -3,40 +3,25 @@ import { dirname, join, resolve } from "node:path";
 
 // --- Types ---
 
-type DockerfileImageSource = {
-  dockerfile: string;
-  context?: string;
-};
-
-type OciImageSource = {
-  oci: string;
-};
-
-type TagImageSource = {
-  tag: string;
-};
-
-type ImageSource = DockerfileImageSource | OciImageSource | TagImageSource;
-
-type ContainerRuntime = "docker" | "podman";
+type OciImageRef = { tag: string; engine?: ContainerEngine };
+type OciImageBuild = { containerfile: string; context?: string; engine?: ContainerEngine };
+type OciImage = OciImageRef | OciImageBuild;
+type ContainerEngine = "docker" | "podman";
 
 /**
  * Total size of the rootfs ext4 image in MB. This is not additional space on
  * top of the OCI/Dockerfile contents — the entire filesystem must fit within
  * this budget. When omitted, defaults to 2048 MB.
  */
-type TuorConfig = {
-  image: ImageSource;
-  runtime?: ContainerRuntime;
-  rootfsSizeMb?: number;
-};
+type RootfsConfig = { ociImage: OciImage; fsSize?: number };
+type TuorConfig = { rootfs: RootfsConfig };
 
 export type {
-  ContainerRuntime,
-  DockerfileImageSource,
-  OciImageSource,
-  TagImageSource,
-  ImageSource,
+  ContainerEngine,
+  OciImage,
+  OciImageBuild,
+  OciImageRef,
+  RootfsConfig,
   TuorConfig,
 };
 
@@ -61,58 +46,55 @@ function findConfigDir(
 
 // --- Config parsing ---
 
-const VALID_RUNTIMES: ContainerRuntime[] = ["docker", "podman"];
+const VALID_ENGINES: ContainerEngine[] = ["docker", "podman"];
 
-function parseRuntime(obj: Record<string, unknown>): ContainerRuntime | undefined {
-  if (!("runtime" in obj)) return undefined;
-  const value = obj.runtime;
-  if (typeof value !== "string" || !VALID_RUNTIMES.includes(value as ContainerRuntime)) {
-    throw new Error(`runtime must be "docker" or "podman"`);
+function parseEngine(obj: Record<string, unknown>): ContainerEngine | undefined {
+  if (!("engine" in obj)) return undefined;
+  const value = obj.engine;
+  if (typeof value !== "string" || !VALID_ENGINES.includes(value as ContainerEngine)) {
+    throw new Error(`engine must be "docker" or "podman"`);
   }
-  return value as ContainerRuntime;
+  return value as ContainerEngine;
 }
 
-function parseRootfsSizeMb(obj: Record<string, unknown>): number | undefined {
-  if (!("rootfsSizeMb" in obj)) return undefined;
-  const value = obj.rootfsSizeMb;
+function parseFsSize(obj: Record<string, unknown>): number | undefined {
+  if (!("fsSize" in obj)) return undefined;
+  const value = obj.fsSize;
   if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
-    throw new Error("rootfsSizeMb must be a positive integer");
+    throw new Error("fsSize must be a positive integer");
   }
   return value;
 }
 
-function parseImageSource(image: Record<string, unknown>): ImageSource {
-  if ("dockerfile" in image) {
-    if (typeof image.dockerfile !== "string" || image.dockerfile === "") {
-      throw new Error("image.dockerfile must be a non-empty string");
+function parseOciImage(obj: Record<string, unknown>): OciImage {
+  const engine = parseEngine(obj);
+
+  if ("containerfile" in obj) {
+    if (typeof obj.containerfile !== "string" || obj.containerfile === "") {
+      throw new Error("ociImage.containerfile must be a non-empty string");
     }
-    if ("context" in image && typeof image.context !== "string") {
-      throw new Error("image.context must be a string");
+    if ("context" in obj && typeof obj.context !== "string") {
+      throw new Error("ociImage.context must be a string");
     }
     return {
-      dockerfile: image.dockerfile,
-      ...(image.context !== undefined
-        ? { context: image.context as string }
-        : {}),
+      containerfile: obj.containerfile,
+      ...(obj.context !== undefined ? { context: obj.context as string } : {}),
+      ...(engine !== undefined ? { engine } : {}),
     };
   }
 
-  if ("oci" in image) {
-    if (typeof image.oci !== "string" || image.oci === "") {
-      throw new Error("image.oci must be a non-empty string");
+  if ("tag" in obj) {
+    if (typeof obj.tag !== "string" || obj.tag === "") {
+      throw new Error("ociImage.tag must be a non-empty string");
     }
-    return { oci: image.oci };
-  }
-
-  if ("tag" in image) {
-    if (typeof image.tag !== "string" || image.tag === "") {
-      throw new Error("image.tag must be a non-empty string");
-    }
-    return { tag: image.tag };
+    return {
+      tag: obj.tag,
+      ...(engine !== undefined ? { engine } : {}),
+    };
   }
 
   throw new Error(
-    "image must have a 'dockerfile', 'oci', or 'tag' field",
+    "ociImage must have a 'containerfile' or 'tag' field",
   );
 }
 
@@ -123,18 +105,24 @@ function parseConfig(raw: unknown): TuorConfig {
 
   const obj = raw as Record<string, unknown>;
 
-  if (!("image" in obj) || typeof obj.image !== "object" || obj.image === null) {
-    throw new Error("config must have an 'image' object");
+  if (!("rootfs" in obj) || typeof obj.rootfs !== "object" || obj.rootfs === null) {
+    throw new Error("config must have a 'rootfs' object");
   }
 
-  const image = parseImageSource(obj.image as Record<string, unknown>);
-  const runtime = parseRuntime(obj);
-  const rootfsSizeMb = parseRootfsSizeMb(obj);
+  const rootfsObj = obj.rootfs as Record<string, unknown>;
+
+  if (!("ociImage" in rootfsObj) || typeof rootfsObj.ociImage !== "object" || rootfsObj.ociImage === null) {
+    throw new Error("rootfs must have an 'ociImage' object");
+  }
+
+  const ociImage = parseOciImage(rootfsObj.ociImage as Record<string, unknown>);
+  const fsSize = parseFsSize(rootfsObj);
 
   return {
-    image,
-    ...(runtime !== undefined ? { runtime } : {}),
-    ...(rootfsSizeMb !== undefined ? { rootfsSizeMb } : {}),
+    rootfs: {
+      ociImage,
+      ...(fsSize !== undefined ? { fsSize } : {}),
+    },
   };
 }
 

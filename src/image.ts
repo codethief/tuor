@@ -12,7 +12,7 @@ import {
   resolveImageSelector,
   setImageRef,
 } from "@earendil-works/gondolin";
-import type { ContainerRuntime, ImageSource, TuorConfig } from "./config.ts";
+import type { ContainerEngine, OciImage, RootfsConfig } from "./config.ts";
 
 const DEFAULT_ROOTFS_SIZE_MB = 2048;
 
@@ -33,17 +33,17 @@ function gondolinTagFromOciRef(ref: string, rootfsSizeMb: number): string {
 // --- Dependency injection types ---
 
 type ImageDeps = {
-  detectRuntime: () => Promise<"docker" | "podman">;
+  detectEngine: () => Promise<"docker" | "podman">;
   buildContainerImage: (
-    runtime: string,
-    dockerfile: string,
+    engine: string,
+    containerfile: string,
     context: string,
   ) => Promise<string>;
   gondolinImageExists: (tag: string) => boolean;
   buildGondolinImage: (
     ociImage: string,
     tag: string,
-    runtime?: ContainerRuntime,
+    engine?: ContainerEngine,
     rootfsSizeMb?: number,
   ) => Promise<void>;
 };
@@ -51,42 +51,38 @@ type ImageDeps = {
 // --- Orchestration ---
 
 async function resolveImage(
-  source: ImageSource,
+  rootfs: RootfsConfig,
   configDir: string,
-  config: Pick<TuorConfig, "runtime" | "rootfsSizeMb">,
   deps: ImageDeps = defaultImageDeps,
 ): Promise<string> {
-  const { runtime } = config;
-  const effectiveSizeMb = config.rootfsSizeMb ?? DEFAULT_ROOTFS_SIZE_MB;
+  const { ociImage } = rootfs;
+  const effectiveSizeMb = rootfs.fsSize ?? DEFAULT_ROOTFS_SIZE_MB;
 
-  if ("tag" in source) {
-    return source.tag;
-  }
-
-  if ("oci" in source) {
-    const tag = gondolinTagFromOciRef(source.oci, effectiveSizeMb);
+  if ("tag" in ociImage) {
+    const { engine } = ociImage;
+    const tag = gondolinTagFromOciRef(ociImage.tag, effectiveSizeMb);
     if (!deps.gondolinImageExists(tag)) {
-      await deps.buildGondolinImage(source.oci, tag, runtime, effectiveSizeMb);
+      await deps.buildGondolinImage(ociImage.tag, tag, engine, effectiveSizeMb);
     }
     return tag;
   }
 
-  const dockerfilePath = resolve(configDir, source.dockerfile);
-  const contextPath = source.context
-    ? resolve(configDir, source.context)
-    : dirname(dockerfilePath);
+  const containerfilePath = resolve(configDir, ociImage.containerfile);
+  const contextPath = ociImage.context
+    ? resolve(configDir, ociImage.context)
+    : dirname(containerfilePath);
 
-  const resolvedRuntime = runtime ?? await deps.detectRuntime();
+  const resolvedEngine = ociImage.engine ?? await deps.detectEngine();
   const imageId = await deps.buildContainerImage(
-    resolvedRuntime,
-    dockerfilePath,
+    resolvedEngine,
+    containerfilePath,
     contextPath,
   );
 
   const tag = gondolinTagFromDockerImageId(imageId, effectiveSizeMb);
 
   if (!deps.gondolinImageExists(tag)) {
-    await deps.buildGondolinImage(imageId, tag, resolvedRuntime, effectiveSizeMb);
+    await deps.buildGondolinImage(imageId, tag, resolvedEngine, effectiveSizeMb);
   }
 
   return tag;
@@ -94,7 +90,7 @@ async function resolveImage(
 
 // --- Default implementations (imperative shell) ---
 
-async function detectRuntime(): Promise<"docker" | "podman"> {
+async function detectEngine(): Promise<"docker" | "podman"> {
   for (const candidate of ["docker", "podman"] as const) {
     const found = await new Promise<boolean>((resolve) => {
       execFile(candidate, ["--version"], (err) => resolve(!err));
@@ -104,26 +100,26 @@ async function detectRuntime(): Promise<"docker" | "podman"> {
     }
   }
   throw new Error(
-    "No container runtime found. Install Docker or Podman.",
+    "No container engine found. Install Docker or Podman.",
   );
 }
 
 async function buildContainerImage(
-  runtime: string,
-  dockerfile: string,
+  engine: string,
+  containerfile: string,
   context: string,
 ): Promise<string> {
   const iidFile = join(mkdtempSync(join(tmpdir(), "tuor-iid-")), "iid");
   const exitCode = await new Promise<number | null>((resolve) => {
     const proc = spawn(
-      runtime,
-      ["build", "--network=host", "--iidfile", iidFile, "-f", dockerfile, context],
+      engine,
+      ["build", "--network=host", "--iidfile", iidFile, "-f", containerfile, context],
       { stdio: ["ignore", "inherit", "inherit"] },
     );
     proc.on("close", resolve);
   });
   if (exitCode !== 0) {
-    throw new Error(`${runtime} build failed with exit code ${exitCode}`);
+    throw new Error(`${engine} build failed with exit code ${exitCode}`);
   }
   return readFileSync(iidFile, "utf-8").trim();
 }
@@ -180,14 +176,14 @@ async function extractSandboxBinaries(
 async function buildGondolinImage(
   ociImage: string,
   tag: string,
-  runtime?: ContainerRuntime,
+  engine?: ContainerEngine,
   rootfsSizeMb?: number,
 ): Promise<void> {
   const defaultAssets = await ensureGuestAssets();
   const binaries = await extractSandboxBinaries(defaultAssets.rootfsPath);
 
   const config = getDefaultBuildConfig();
-  config.oci = { image: ociImage, pullPolicy: "if-not-present", runtime };
+  config.oci = { image: ociImage, pullPolicy: "if-not-present", runtime: engine };
   config.rootfs = { sizeMb: rootfsSizeMb };
   config.sandboxdPath = binaries["sandboxd"];
   config.sandboxfsPath = binaries["sandboxfs"];
@@ -202,7 +198,7 @@ async function buildGondolinImage(
 }
 
 const defaultImageDeps: ImageDeps = {
-  detectRuntime,
+  detectEngine,
   buildContainerImage,
   gondolinImageExists,
   buildGondolinImage,

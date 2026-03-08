@@ -19,24 +19,24 @@ describe("findConfigDir", () => {
 });
 
 describe("parseConfig", () => {
-  test("parses valid dockerfile source", () => {
-    const raw = { image: { dockerfile: "./Dockerfile" } };
+  test("parses valid containerfile source", () => {
+    const raw = { rootfs: { ociImage: { containerfile: "./Containerfile" } } };
     expect(parseConfig(raw)).toEqual({
-      image: { dockerfile: "./Dockerfile" },
+      rootfs: { ociImage: { containerfile: "./Containerfile" } },
     });
   });
 
-  test("parses dockerfile source with context", () => {
-    const raw = { image: { dockerfile: "./Dockerfile", context: "./ctx" } };
+  test("parses containerfile source with context", () => {
+    const raw = { rootfs: { ociImage: { containerfile: "./Containerfile", context: "./ctx" } } };
     expect(parseConfig(raw)).toEqual({
-      image: { dockerfile: "./Dockerfile", context: "./ctx" },
+      rootfs: { ociImage: { containerfile: "./Containerfile", context: "./ctx" } },
     });
   });
 
   test("parses valid tag source", () => {
-    const raw = { image: { tag: "default:latest" } };
+    const raw = { rootfs: { ociImage: { tag: "docker.io/ubuntu:latest" } } };
     expect(parseConfig(raw)).toEqual({
-      image: { tag: "default:latest" },
+      rootfs: { ociImage: { tag: "docker.io/ubuntu:latest" } },
     });
   });
 
@@ -52,118 +52,109 @@ describe("parseConfig", () => {
     expect(() => parseConfig([1, 2])).toThrow("config must be a JSON object");
   });
 
-  test("throws when image field is missing", () => {
-    expect(() => parseConfig({})).toThrow("config must have an 'image' object");
+  test("throws when rootfs field is missing", () => {
+    expect(() => parseConfig({})).toThrow("config must have a 'rootfs' object");
   });
 
-  test("throws when image is not an object", () => {
-    expect(() => parseConfig({ image: "string" })).toThrow(
-      "config must have an 'image' object",
+  test("throws when rootfs is not an object", () => {
+    expect(() => parseConfig({ rootfs: "string" })).toThrow(
+      "config must have a 'rootfs' object",
     );
   });
 
-  test("parses valid oci source", () => {
-    const raw = { image: { oci: "docker.io/ubuntu:latest" } };
-    expect(parseConfig(raw)).toEqual({
-      image: { oci: "docker.io/ubuntu:latest" },
-    });
-  });
-
-  test("throws when oci is not a string", () => {
-    expect(() => parseConfig({ image: { oci: 42 } })).toThrow(
-      "image.oci must be a non-empty string",
+  test("throws when ociImage field is missing", () => {
+    expect(() => parseConfig({ rootfs: {} })).toThrow(
+      "rootfs must have an 'ociImage' object",
     );
   });
 
-  test("throws when oci is empty", () => {
-    expect(() => parseConfig({ image: { oci: "" } })).toThrow(
-      "image.oci must be a non-empty string",
+  test("throws when ociImage is not an object", () => {
+    expect(() => parseConfig({ rootfs: { ociImage: "string" } })).toThrow(
+      "rootfs must have an 'ociImage' object",
     );
   });
 
-  test("throws when image has no recognized field", () => {
-    expect(() => parseConfig({ image: { other: "value" } })).toThrow(
-      "image must have a 'dockerfile', 'oci', or 'tag' field",
+  test("throws when ociImage has no recognized field", () => {
+    expect(() => parseConfig({ rootfs: { ociImage: { other: "value" } } })).toThrow(
+      "ociImage must have a 'containerfile' or 'tag' field",
     );
   });
 
-  test("throws when dockerfile is not a string", () => {
-    expect(() => parseConfig({ image: { dockerfile: 42 } })).toThrow(
-      "image.dockerfile must be a non-empty string",
+  test("throws when containerfile is not a string", () => {
+    expect(() => parseConfig({ rootfs: { ociImage: { containerfile: 42 } } })).toThrow(
+      "ociImage.containerfile must be a non-empty string",
     );
   });
 
-  test("throws when dockerfile is empty", () => {
-    expect(() => parseConfig({ image: { dockerfile: "" } })).toThrow(
-      "image.dockerfile must be a non-empty string",
+  test("throws when containerfile is empty", () => {
+    expect(() => parseConfig({ rootfs: { ociImage: { containerfile: "" } } })).toThrow(
+      "ociImage.containerfile must be a non-empty string",
     );
   });
 
   test("throws when tag is not a string", () => {
-    expect(() => parseConfig({ image: { tag: 123 } })).toThrow(
-      "image.tag must be a non-empty string",
+    expect(() => parseConfig({ rootfs: { ociImage: { tag: 123 } } })).toThrow(
+      "ociImage.tag must be a non-empty string",
     );
   });
 
   test("throws when tag is empty", () => {
-    expect(() => parseConfig({ image: { tag: "" } })).toThrow(
-      "image.tag must be a non-empty string",
+    expect(() => parseConfig({ rootfs: { ociImage: { tag: "" } } })).toThrow(
+      "ociImage.tag must be a non-empty string",
     );
   });
 
   test("throws when context is not a string", () => {
     expect(() =>
-      parseConfig({ image: { dockerfile: "./Dockerfile", context: 42 } }),
-    ).toThrow("image.context must be a string");
+      parseConfig({ rootfs: { ociImage: { containerfile: "./Containerfile", context: 42 } } }),
+    ).toThrow("ociImage.context must be a string");
   });
 
-  test("parses runtime field", () => {
-    const raw = { image: { tag: "default:latest" }, runtime: "podman" };
+  test("parses engine field inside ociImage", () => {
+    const raw = { rootfs: { ociImage: { tag: "ubuntu:latest", engine: "podman" } } };
     expect(parseConfig(raw)).toEqual({
-      image: { tag: "default:latest" },
-      runtime: "podman",
+      rootfs: { ociImage: { tag: "ubuntu:latest", engine: "podman" } },
     });
   });
 
-  test("omits runtime when not specified", () => {
-    const raw = { image: { tag: "default:latest" } };
+  test("omits engine when not specified", () => {
+    const raw = { rootfs: { ociImage: { tag: "ubuntu:latest" } } };
     expect(parseConfig(raw)).toEqual({
-      image: { tag: "default:latest" },
+      rootfs: { ociImage: { tag: "ubuntu:latest" } },
     });
   });
 
-  test("throws when runtime is invalid", () => {
+  test("throws when engine is invalid", () => {
     expect(() =>
-      parseConfig({ image: { tag: "x:y" }, runtime: "containerd" }),
-    ).toThrow('runtime must be "docker" or "podman"');
+      parseConfig({ rootfs: { ociImage: { tag: "x:y", engine: "containerd" } } }),
+    ).toThrow('engine must be "docker" or "podman"');
   });
 
-  test("parses rootfsSizeMb field", () => {
-    const raw = { image: { tag: "default:latest" }, rootfsSizeMb: 4096 };
+  test("parses fsSize field", () => {
+    const raw = { rootfs: { ociImage: { tag: "ubuntu:latest" }, fsSize: 4096 } };
     expect(parseConfig(raw)).toEqual({
-      image: { tag: "default:latest" },
-      rootfsSizeMb: 4096,
+      rootfs: { ociImage: { tag: "ubuntu:latest" }, fsSize: 4096 },
     });
   });
 
-  test("omits rootfsSizeMb when not specified", () => {
-    const raw = { image: { tag: "default:latest" } };
+  test("omits fsSize when not specified", () => {
+    const raw = { rootfs: { ociImage: { tag: "ubuntu:latest" } } };
     expect(parseConfig(raw)).toEqual({
-      image: { tag: "default:latest" },
+      rootfs: { ociImage: { tag: "ubuntu:latest" } },
     });
   });
 
-  test("throws when rootfsSizeMb is not a positive integer", () => {
+  test("throws when fsSize is not a positive integer", () => {
     expect(() =>
-      parseConfig({ image: { tag: "x:y" }, rootfsSizeMb: -1 }),
-    ).toThrow("rootfsSizeMb must be a positive integer");
+      parseConfig({ rootfs: { ociImage: { tag: "x:y" }, fsSize: -1 } }),
+    ).toThrow("fsSize must be a positive integer");
 
     expect(() =>
-      parseConfig({ image: { tag: "x:y" }, rootfsSizeMb: 1.5 }),
-    ).toThrow("rootfsSizeMb must be a positive integer");
+      parseConfig({ rootfs: { ociImage: { tag: "x:y" }, fsSize: 1.5 } }),
+    ).toThrow("fsSize must be a positive integer");
 
     expect(() =>
-      parseConfig({ image: { tag: "x:y" }, rootfsSizeMb: "big" }),
-    ).toThrow("rootfsSizeMb must be a positive integer");
+      parseConfig({ rootfs: { ociImage: { tag: "x:y" }, fsSize: "big" } }),
+    ).toThrow("fsSize must be a positive integer");
   });
 });
