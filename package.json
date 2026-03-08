@@ -6,12 +6,15 @@
     "tuor": "src/main.ts"
   },
   "scripts": {
-    "test": "bun test",
+    "start": "node --import tsx src/main.ts",
+    "test": "vitest run src/",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "typescript": "^5"
+    "@types/node": "^22",
+    "tsx": "^4",
+    "typescript": "^5",
+    "vitest": "^3"
   },
   "dependencies": {
     "@earendil-works/gondolin": "^0.6.0"

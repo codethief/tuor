@@ -16,6 +16,7 @@
     // Best practices
     "strict": true,
     "skipLibCheck": true,
+    "types": ["@types/node"],
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,

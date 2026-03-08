@@ -25,5 +25,11 @@ do:
 
 ```
 mise install
-bun install
+npm install
+```
+
+```
+npm start                            # or: node --import tsx src/main.ts
+npm test                             # run tests
+npm run typecheck                    # type-check
 ```

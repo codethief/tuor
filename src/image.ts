@@ -1,3 +1,4 @@
+import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -95,12 +96,10 @@ async function resolveImage(
 
 async function detectRuntime(): Promise<"docker" | "podman"> {
   for (const candidate of ["docker", "podman"] as const) {
-    const proc = Bun.spawn([candidate, "--version"], {
-      stdout: "ignore",
-      stderr: "ignore",
+    const found = await new Promise<boolean>((resolve) => {
+      execFile(candidate, ["--version"], (err) => resolve(!err));
     });
-    const exitCode = await proc.exited;
-    if (exitCode === 0) {
+    if (found) {
       return candidate;
     }
   }
@@ -115,11 +114,14 @@ async function buildContainerImage(
   context: string,
 ): Promise<string> {
   const iidFile = join(mkdtempSync(join(tmpdir(), "tuor-iid-")), "iid");
-  const proc = Bun.spawn(
-    [runtime, "build", "--network=host", "--iidfile", iidFile, "-f", dockerfile, context],
-    { stdout: "inherit", stderr: "inherit" },
-  );
-  const exitCode = await proc.exited;
+  const exitCode = await new Promise<number | null>((resolve) => {
+    const proc = spawn(
+      runtime,
+      ["build", "--network=host", "--iidfile", iidFile, "-f", dockerfile, context],
+      { stdio: ["ignore", "inherit", "inherit"] },
+    );
+    proc.on("close", resolve);
+  });
   if (exitCode !== 0) {
     throw new Error(`${runtime} build failed with exit code ${exitCode}`);
   }
@@ -150,13 +152,20 @@ async function extractSandboxBinaries(
 
   for (const name of SANDBOX_BINARIES) {
     const outPath = join(extractDir, name);
-    const proc = Bun.spawn(
-      ["debugfs", rootfsPath, "-R", `dump /usr/bin/${name} ${outPath}`],
-      { stdout: "ignore", stderr: "pipe" },
-    );
-    const exitCode = await proc.exited;
+    const { exitCode, stderr } = await new Promise<{ exitCode: number | null; stderr: string }>((resolve) => {
+      const proc = spawn(
+        "debugfs",
+        [rootfsPath, "-R", `dump /usr/bin/${name} ${outPath}`],
+        { stdio: ["ignore", "ignore", "pipe"] },
+      );
+      const chunks: Buffer[] = [];
+      proc.stderr!.on("data", (chunk: Buffer) => chunks.push(chunk));
+      proc.on("close", (code) => resolve({
+        exitCode: code,
+        stderr: Buffer.concat(chunks).toString("utf-8"),
+      }));
+    });
     if (exitCode !== 0) {
-      const stderr = await new Response(proc.stderr).text();
       throw new Error(
         `Failed to extract ${name} from default Gondolin image: ${stderr.trim()}`,
       );
