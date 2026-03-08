@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { chmodSync, mkdtempSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import {
@@ -11,20 +11,22 @@ import {
   resolveImageSelector,
   setImageRef,
 } from "@earendil-works/gondolin";
-import type { ImageSource } from "./config.ts";
+import type { ContainerRuntime, ImageSource, TuorConfig } from "./config.ts";
+
+const DEFAULT_ROOTFS_SIZE_MB = 2048;
 
 // --- Pure helpers ---
 
-function gondolinTagFromDockerImageId(imageId: string): string {
-  const hex = imageId.startsWith("sha256:")
-    ? imageId.slice("sha256:".length)
-    : imageId;
-  return `tuor:${hex.slice(0, 12)}`;
+function buildTagHash(...parts: (string | number)[]): string {
+  return createHash("sha256").update(parts.join("\0")).digest("hex").slice(0, 12);
 }
 
-function gondolinTagFromOciRef(ref: string): string {
-  const hash = createHash("sha256").update(ref).digest("hex").slice(0, 12);
-  return `tuor-oci:${hash}`;
+function gondolinTagFromDockerImageId(imageId: string, rootfsSizeMb: number): string {
+  return `tuor:${buildTagHash(imageId, rootfsSizeMb)}`;
+}
+
+function gondolinTagFromOciRef(ref: string, rootfsSizeMb: number): string {
+  return `tuor-oci:${buildTagHash(ref, rootfsSizeMb)}`;
 }
 
 // --- Dependency injection types ---
@@ -37,7 +39,12 @@ type ImageDeps = {
     context: string,
   ) => Promise<string>;
   gondolinImageExists: (tag: string) => boolean;
-  buildGondolinImage: (ociImage: string, tag: string) => Promise<void>;
+  buildGondolinImage: (
+    ociImage: string,
+    tag: string,
+    runtime?: ContainerRuntime,
+    rootfsSizeMb?: number,
+  ) => Promise<void>;
 };
 
 // --- Orchestration ---
@@ -45,16 +52,20 @@ type ImageDeps = {
 async function resolveImage(
   source: ImageSource,
   configDir: string,
+  config: Pick<TuorConfig, "runtime" | "rootfsSizeMb">,
   deps: ImageDeps = defaultImageDeps,
 ): Promise<string> {
+  const { runtime } = config;
+  const effectiveSizeMb = config.rootfsSizeMb ?? DEFAULT_ROOTFS_SIZE_MB;
+
   if ("tag" in source) {
     return source.tag;
   }
 
   if ("oci" in source) {
-    const tag = gondolinTagFromOciRef(source.oci);
+    const tag = gondolinTagFromOciRef(source.oci, effectiveSizeMb);
     if (!deps.gondolinImageExists(tag)) {
-      await deps.buildGondolinImage(source.oci, tag);
+      await deps.buildGondolinImage(source.oci, tag, runtime, effectiveSizeMb);
     }
     return tag;
   }
@@ -64,17 +75,17 @@ async function resolveImage(
     ? resolve(configDir, source.context)
     : dirname(dockerfilePath);
 
-  const runtime = await deps.detectRuntime();
+  const resolvedRuntime = runtime ?? await deps.detectRuntime();
   const imageId = await deps.buildContainerImage(
-    runtime,
+    resolvedRuntime,
     dockerfilePath,
     contextPath,
   );
 
-  const tag = gondolinTagFromDockerImageId(imageId);
+  const tag = gondolinTagFromDockerImageId(imageId, effectiveSizeMb);
 
   if (!deps.gondolinImageExists(tag)) {
-    await deps.buildGondolinImage(imageId, tag);
+    await deps.buildGondolinImage(imageId, tag, resolvedRuntime, effectiveSizeMb);
   }
 
   return tag;
@@ -103,16 +114,16 @@ async function buildContainerImage(
   dockerfile: string,
   context: string,
 ): Promise<string> {
-  const proc = Bun.spawn([runtime, "build", "-q", "-f", dockerfile, context], {
-    stdout: "pipe",
-    stderr: "inherit",
-  });
+  const iidFile = join(mkdtempSync(join(tmpdir(), "tuor-iid-")), "iid");
+  const proc = Bun.spawn(
+    [runtime, "build", "--network=host", "--iidfile", iidFile, "-f", dockerfile, context],
+    { stdout: "inherit", stderr: "inherit" },
+  );
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
     throw new Error(`${runtime} build failed with exit code ${exitCode}`);
   }
-  const output = await new Response(proc.stdout).text();
-  return output.trim();
+  return readFileSync(iidFile, "utf-8").trim();
 }
 
 function gondolinImageExists(tag: string): boolean {
@@ -160,12 +171,15 @@ async function extractSandboxBinaries(
 async function buildGondolinImage(
   ociImage: string,
   tag: string,
+  runtime?: ContainerRuntime,
+  rootfsSizeMb?: number,
 ): Promise<void> {
   const defaultAssets = await ensureGuestAssets();
   const binaries = await extractSandboxBinaries(defaultAssets.rootfsPath);
 
   const config = getDefaultBuildConfig();
-  config.oci = { image: ociImage, pullPolicy: "if-not-present" };
+  config.oci = { image: ociImage, pullPolicy: "if-not-present", runtime };
+  config.rootfs = { sizeMb: rootfsSizeMb };
   config.sandboxdPath = binaries["sandboxd"];
   config.sandboxfsPath = binaries["sandboxfs"];
   config.sandboxsshPath = binaries["sandboxssh"];

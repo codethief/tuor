@@ -14,8 +14,11 @@ if (!configDir) {
 
 const raw = JSON.parse(readFileSync(join(configDir, "config.json"), "utf-8"));
 const config = parseConfig(raw);
-const imageTag = await resolveImage(config.image, configDir);
+const imageTag = await resolveImage(config.image, configDir, config);
 
-const vm = await VM.create({ sandbox: { imagePath: imageTag } });
+const vm = await VM.create({
+  sandbox: { imagePath: imageTag },
+  dns: { mode: "open" },
+});
 await vm.shell({ attach: true });
 await vm.close();

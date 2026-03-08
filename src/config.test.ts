@@ -116,4 +116,54 @@ describe("parseConfig", () => {
       parseConfig({ image: { dockerfile: "./Dockerfile", context: 42 } }),
     ).toThrow("image.context must be a string");
   });
+
+  test("parses runtime field", () => {
+    const raw = { image: { tag: "default:latest" }, runtime: "podman" };
+    expect(parseConfig(raw)).toEqual({
+      image: { tag: "default:latest" },
+      runtime: "podman",
+    });
+  });
+
+  test("omits runtime when not specified", () => {
+    const raw = { image: { tag: "default:latest" } };
+    expect(parseConfig(raw)).toEqual({
+      image: { tag: "default:latest" },
+    });
+  });
+
+  test("throws when runtime is invalid", () => {
+    expect(() =>
+      parseConfig({ image: { tag: "x:y" }, runtime: "containerd" }),
+    ).toThrow('runtime must be "docker" or "podman"');
+  });
+
+  test("parses rootfsSizeMb field", () => {
+    const raw = { image: { tag: "default:latest" }, rootfsSizeMb: 4096 };
+    expect(parseConfig(raw)).toEqual({
+      image: { tag: "default:latest" },
+      rootfsSizeMb: 4096,
+    });
+  });
+
+  test("omits rootfsSizeMb when not specified", () => {
+    const raw = { image: { tag: "default:latest" } };
+    expect(parseConfig(raw)).toEqual({
+      image: { tag: "default:latest" },
+    });
+  });
+
+  test("throws when rootfsSizeMb is not a positive integer", () => {
+    expect(() =>
+      parseConfig({ image: { tag: "x:y" }, rootfsSizeMb: -1 }),
+    ).toThrow("rootfsSizeMb must be a positive integer");
+
+    expect(() =>
+      parseConfig({ image: { tag: "x:y" }, rootfsSizeMb: 1.5 }),
+    ).toThrow("rootfsSizeMb must be a positive integer");
+
+    expect(() =>
+      parseConfig({ image: { tag: "x:y" }, rootfsSizeMb: "big" }),
+    ).toThrow("rootfsSizeMb must be a positive integer");
+  });
 });
