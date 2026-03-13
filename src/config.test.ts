@@ -144,6 +144,33 @@ describe("parseConfig", () => {
     });
   });
 
+  test("parses user field when present", () => {
+    const raw = { rootfs: { ociImage: { tag: "ubuntu:latest" } }, user: "myuser" };
+    expect(parseConfig(raw)).toEqual({
+      rootfs: { ociImage: { tag: "ubuntu:latest" } },
+      user: "myuser",
+    });
+  });
+
+  test("omits user when not specified", () => {
+    const raw = { rootfs: { ociImage: { tag: "ubuntu:latest" } } };
+    expect(parseConfig(raw)).toEqual({
+      rootfs: { ociImage: { tag: "ubuntu:latest" } },
+    });
+  });
+
+  test("throws when user is not a string", () => {
+    expect(() =>
+      parseConfig({ rootfs: { ociImage: { tag: "x:y" } }, user: 42 }),
+    ).toThrow("user must be a non-empty string");
+  });
+
+  test("throws when user is an empty string", () => {
+    expect(() =>
+      parseConfig({ rootfs: { ociImage: { tag: "x:y" } }, user: "" }),
+    ).toThrow("user must be a non-empty string");
+  });
+
   test("throws when fsSize is not a positive integer", () => {
     expect(() =>
       parseConfig({ rootfs: { ociImage: { tag: "x:y" }, fsSize: -1 } }),

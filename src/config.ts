@@ -14,7 +14,7 @@ type ContainerEngine = "docker" | "podman";
  * this budget. When omitted, defaults to 2048 MB.
  */
 type RootfsConfig = { ociImage: OciImage; fsSize?: number };
-type TuorConfig = { rootfs: RootfsConfig };
+type TuorConfig = { rootfs: RootfsConfig; user?: string };
 
 export type {
   ContainerEngine,
@@ -118,11 +118,18 @@ function parseConfig(raw: unknown): TuorConfig {
   const ociImage = parseOciImage(rootfsObj.ociImage as Record<string, unknown>);
   const fsSize = parseFsSize(rootfsObj);
 
+  if ("user" in obj) {
+    if (typeof obj.user !== "string" || obj.user === "") {
+      throw new Error("user must be a non-empty string");
+    }
+  }
+
   return {
     rootfs: {
       ociImage,
       ...(fsSize !== undefined ? { fsSize } : {}),
     },
+    ...(typeof obj.user === "string" ? { user: obj.user } : {}),
   };
 }
 

@@ -20,5 +20,10 @@ const vm = await VM.create({
   sandbox: { imagePath: imageTag },
   dns: { mode: "open" },
 });
-await vm.shell({ attach: true });
+await vm.shell({
+  attach: true,
+  // This will typically fail for users which are not root or UID 1000, see
+  // https://github.com/earendil-works/gondolin/issues/74
+  ...(config.user ? { command: ["su", "-", config.user] } : {}),
+});
 await vm.close();
