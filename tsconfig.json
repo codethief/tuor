@@ -24,7 +24,10 @@
     // Some stricter flags (disabled by default)
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
+    "noPropertyAccessFromIndexSignature": false,
+
+    // https://nodejs.org/en/learn/typescript/run-natively
+    "erasableSyntaxOnly": true,
   },
   "include": ["src"]
 }
