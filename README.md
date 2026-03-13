@@ -1,22 +1,65 @@
-# Tuor, a CLI for sandboxing your coding agents
+# Tuor, a CLI for sandboxing coding agents and other dev tools
 Tuor is a convenience wrapper around
-[Gondolin](https://github.com/earendil-works/gondolin), a tool that allows
-spawning micro VMs (using QEMU or libkrun) for the purpose of sandboxing coding
-agents.
+[Gondolin](https://github.com/earendil-works/gondolin), a tool for configuring &
+spawning Linux micro VMs through a TypeScript API (mainly for the purpose of
+sandboxing coding agents).
 
 While Gondolin focuses on the low-level virtualization plumbing and on providing
 a great and flexible API, Tuor's goal is to provide an easy-to-use CLI for
-common use cases.
+common use cases and make using micro VMs for development – whether agentic
+coding or otherwise¹ – as convenient as possible. (¹ I have always been
+terrified of blindly `npm install`ing hundreds of packages…)
 
-I'm building Tuor mainly to scratch my own itch. Maybe it will make sense to
-upstream some of its features to Gondolin eventually. However, right now I just
-want convenient sandboxing because I'm tired of reviewing every single shell
-command my agent wants to execute. Then again, I'm not even sure yet what
-"convenient" would look like exactly. So Tuor is also somewhat of an experiment.
+However, I don't know yet what "convenience" will look like – part of
+building Tuor is figuring that out. For now I'm just trying to scratch my own
+itch and to get something halfway decent working, which integrates nicely with
+my personal workflow.
+
+
+# General dependencies
+- `gondolin build`
+  [dependencies](https://earendil-works.github.io/gondolin/custom-images/#build-requirements)
+- Gondolin runtime dependencies (QEMU)
+- Docker or Podman to build and/or retrieve container images
 
 
 # Usage
-TODO
+I haven't gotten around packaging Tuor yet; please see the development
+instructions below for installation instructions.
+
+Tuor looks for a `.tuor/config.json` file in the current working directory to
+configure the VM. Example config:
+
+```javascript
+{
+  "rootfs": {
+    "ociImage": {
+      "containerfile": "./Dockerfile",  // relative to config.json
+      "engine": "docker"  // or "podman"
+    },
+    "fsSize": 4096  // Total rootfs size, including OCI image
+  },
+  "user": "root",  // User must currently be root or the user with UID 1000 (or whatever UID you use on the host), see https://github.com/earendil-works/gondolin/issues/74
+  "workdir": {
+      "hostPath": "..",  // relative to config.json
+      "guestPath": "/workspace"  // Can be omitted, in which case guestPath will be set to the resolved (absolute) hostPath
+  },
+  "mounts": [
+    {
+      "hostPath": "/path/on/the/host",
+      "guestPath": "/path/on/the/guest",
+      "readonly": true,
+    }
+  ]
+}
+```
+
+With this config, Tuor will 
+- build the Dockerfile using Docker, 
+- pass the resulting container image to `gondolin build` to build a VM image
+  ([using the container image as
+  rootfs](https://earendil-works.github.io/gondolin/custom-images/#oci-support)),
+- configure Gondolin and start the VM.
 
 
 # Development
@@ -29,7 +72,17 @@ npm install
 ```
 
 ```
-npm start
+npm start  # Fire up Tuor (will look for a .tuor/config.json in the current directory)
 npm test
 npm run typecheck
 ```
+
+
+# Security and threat model
+Since Tuor is a wrapper around Gondolin, [Gondolin's security
+guarantees](https://earendil-works.github.io/gondolin/security/) apply.
+
+
+# Acknowledgments
+Given that Tuor is mainly a thin wrapper around Gondolin, the actual & difficult
+work is done by Gondolin's maintainer @mitsuhiko. Huge thanks to him!

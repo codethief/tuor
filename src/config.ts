@@ -39,14 +39,7 @@ const types = scope({
   WorkdirConfig: "AbsoluteGuestPath | MountConfig",
   TuorConfig: {
     rootfs: "RootfsConfig",
-
-    /**
-     * User must currently be root or the user with UID 1000 (or whatever UID
-     * you use on the host), see
-     * https://github.com/earendil-works/gondolin/issues/74
-     */
     "user": "string > 0 = 'root'",
-
     "mounts?": "MountConfig[]",
     "workdir": "WorkdirConfig = '/'",
   },
