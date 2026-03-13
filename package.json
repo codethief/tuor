@@ -6,7 +6,7 @@
     "tuor": "src/main.ts"
   },
   "scripts": {
-    "start": "node --import tsx src/main.ts",
+    "start": "./src/main.ts",
     "test": "vitest run src/",
     "typecheck": "tsc --noEmit"
   },
