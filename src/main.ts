@@ -37,9 +37,6 @@ await vm.shell({
   // `su myuser` gives us an interactive non-login shell (`su - myuser` would
   // give us a login shell but would also cd into the user's home dir, messing
   // with the cwd we configure below.)
-  //
-  // `su` will typically fail for users which are not root or UID 1000, see
-  // https://github.com/earendil-works/gondolin/issues/74
   command: ["su", config.user],
   cwd: workdir.guestPath,
 });
