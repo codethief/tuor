@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { VM } from "@earendil-works/gondolin";
 import { findConfigDir, parseConfig } from "./config.ts";
 import { resolveImage } from "./image.ts";
+import { prepareMounts } from "./mounts.ts";
 
 const configDir = findConfigDir(process.cwd());
 if (!configDir) {
@@ -15,10 +16,14 @@ if (!configDir) {
 const raw = JSON.parse(readFileSync(join(configDir, "config.json"), "utf-8"));
 const config = parseConfig(raw);
 const imageTag = await resolveImage(config.rootfs, configDir);
+const vfsMounts = config.mounts
+  ? prepareMounts(config.mounts, configDir)
+  : undefined;
 
 const vm = await VM.create({
   sandbox: { imagePath: imageTag },
   dns: { mode: "open" },
+  ...(vfsMounts ? { vfs: { mounts: vfsMounts } } : {}),
 });
 await vm.shell({
   attach: true,

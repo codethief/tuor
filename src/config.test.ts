@@ -51,6 +51,64 @@ describe("parseConfig", () => {
     });
   });
 
+  test("parses mounts with all fields", () => {
+    const raw = {
+      rootfs: { ociImage: { tag: "ubuntu:latest" } },
+      mounts: [
+        {
+          hostPath: "/home/user/project",
+          guestPath: "/workspace",
+          readOnly: true,
+        },
+      ],
+    };
+    expect(parseConfig(raw)).toEqual({
+      rootfs: { ociImage: { tag: "ubuntu:latest" }, fsSize: 2048 },
+      mounts: [
+        {
+          hostPath: "/home/user/project",
+          guestPath: "/workspace",
+          readOnly: true,
+        },
+      ],
+    });
+  });
+
+  test("parses mounts with hostPath only, readOnly defaults to false", () => {
+    const raw = {
+      rootfs: { ociImage: { tag: "ubuntu:latest" } },
+      mounts: [{ hostPath: "../myproject" }],
+    };
+    expect(parseConfig(raw)).toEqual({
+      rootfs: { ociImage: { tag: "ubuntu:latest" }, fsSize: 2048 },
+      mounts: [{ hostPath: "../myproject", readOnly: false }],
+    });
+  });
+
+  test("rejects mounts with relative guestPath", () => {
+    const raw = {
+      rootfs: { ociImage: { tag: "ubuntu:latest" } },
+      mounts: [{ hostPath: "/foo", guestPath: "relative/path" }],
+    };
+    expect(() => parseConfig(raw)).toThrow();
+  });
+
+  test("rejects mounts with empty hostPath", () => {
+    const raw = {
+      rootfs: { ociImage: { tag: "ubuntu:latest" } },
+      mounts: [{ hostPath: "" }],
+    };
+    expect(() => parseConfig(raw)).toThrow();
+  });
+
+  test("rejects mounts with non-string hostPath", () => {
+    const raw = {
+      rootfs: { ociImage: { tag: "ubuntu:latest" } },
+      mounts: [{ hostPath: 123 }],
+    };
+    expect(() => parseConfig(raw)).toThrow();
+  });
+
   test("rejects invalid input", () => {
     expect(() => parseConfig("not an object")).toThrow();
     expect(() => parseConfig({ rootfs: { ociImage: {} } })).toThrow();

@@ -25,9 +25,15 @@ const types = scope({
     ociImage: "OciImage",
     "fsSize": "number.integer > 0 = 2048",
   },
+  MountConfig: {
+    hostPath: "string > 0",
+    "guestPath?": type("string > 0").matching(/^\//),
+    "readOnly": "boolean = false",
+  },
   TuorConfig: {
     rootfs: "RootfsConfig",
     "user?": "string > 0",
+    "mounts?": "MountConfig[]",
   },
 }).export();
 
@@ -36,10 +42,12 @@ type OciImageRef = typeof types.OciImageRef.infer;
 type OciImageBuild = typeof types.OciImageBuild.infer;
 type OciImage = typeof types.OciImage.infer;
 type RootfsConfig = typeof types.RootfsConfig.infer;
+type MountConfig = typeof types.MountConfig.infer;
 type TuorConfig = typeof types.TuorConfig.infer;
 
 export type {
   ContainerEngine,
+  MountConfig,
   OciImage,
   OciImageBuild,
   OciImageRef,
