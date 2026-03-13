@@ -25,15 +25,23 @@ const types = scope({
     ociImage: "OciImage",
     "fsSize": "number.integer > 0 = 2048",
   },
+  AbsoluteGuestPath: type("string > 0").matching(/^\//),
   MountConfig: {
     hostPath: "string > 0",
-    "guestPath?": type("string > 0").matching(/^\//),
+    "guestPath?": "AbsoluteGuestPath",
     "readOnly": "boolean = false",
   },
+  /**
+   * Working directory inside the guest. Either just a guest path (string) to cd
+   * into, or a full mount config (which also sets up the host→guest mount and
+   * then cd's into the guest path).
+   */
+  WorkdirConfig: "AbsoluteGuestPath | MountConfig",
   TuorConfig: {
     rootfs: "RootfsConfig",
-    "user?": "string > 0",
+    "user": "string > 0 = 'root'",
     "mounts?": "MountConfig[]",
+    "workdir": "WorkdirConfig = '/'",
   },
 }).export();
 
@@ -43,6 +51,7 @@ type OciImageBuild = typeof types.OciImageBuild.infer;
 type OciImage = typeof types.OciImage.infer;
 type RootfsConfig = typeof types.RootfsConfig.infer;
 type MountConfig = typeof types.MountConfig.infer;
+type WorkdirConfig = typeof types.WorkdirConfig.infer;
 type TuorConfig = typeof types.TuorConfig.infer;
 
 export type {
@@ -53,6 +62,7 @@ export type {
   OciImageRef,
   RootfsConfig,
   TuorConfig,
+  WorkdirConfig,
 };
 
 // --- Config discovery ---

@@ -4,6 +4,7 @@ import { VM } from "@earendil-works/gondolin";
 import { findConfigDir, parseConfig } from "./config.ts";
 import { resolveImage } from "./image.ts";
 import { prepareMounts } from "./mounts.ts";
+import { resolveWorkdir } from "./workdir.ts";
 
 const configDir = findConfigDir(process.cwd());
 if (!configDir) {
@@ -16,9 +17,15 @@ if (!configDir) {
 const raw = JSON.parse(readFileSync(join(configDir, "config.json"), "utf-8"));
 const config = parseConfig(raw);
 const imageTag = await resolveImage(config.rootfs, configDir);
-const vfsMounts = config.mounts
-  ? prepareMounts(config.mounts, configDir)
-  : undefined;
+
+const workdir = resolveWorkdir(config.workdir, configDir);
+
+const allMounts = [
+  ...(config.mounts ?? []),
+  ...(workdir.mount ? [workdir.mount] : []),
+];
+const vfsMounts =
+  allMounts.length > 0 ? prepareMounts(allMounts, configDir) : undefined;
 
 const vm = await VM.create({
   sandbox: { imagePath: imageTag },
@@ -27,8 +34,13 @@ const vm = await VM.create({
 });
 await vm.shell({
   attach: true,
-  // This will typically fail for users which are not root or UID 1000, see
+  // `su myuser` gives us an interactive non-login shell (`su - myuser` would
+  // give us a login shell but would also cd into the user's home dir, messing
+  // with the cwd we configure below.)
+  //
+  // `su` will typically fail for users which are not root or UID 1000, see
   // https://github.com/earendil-works/gondolin/issues/74
-  ...(config.user ? { command: ["su", "-", config.user] } : {}),
+  command: ["su", config.user],
+  cwd: workdir.guestPath,
 });
 await vm.close();

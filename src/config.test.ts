@@ -23,6 +23,8 @@ describe("parseConfig", () => {
     const raw = { rootfs: { ociImage: { tag: "docker.io/ubuntu:latest" } } };
     expect(parseConfig(raw)).toEqual({
       rootfs: { ociImage: { tag: "docker.io/ubuntu:latest" }, fsSize: 2048 },
+      user: "root",
+      workdir: "/",
     });
   });
 
@@ -48,6 +50,7 @@ describe("parseConfig", () => {
         fsSize: 4096,
       },
       user: "myuser",
+      workdir: "/",
     });
   });
 
@@ -64,6 +67,7 @@ describe("parseConfig", () => {
     };
     expect(parseConfig(raw)).toEqual({
       rootfs: { ociImage: { tag: "ubuntu:latest" }, fsSize: 2048 },
+      user: "root",
       mounts: [
         {
           hostPath: "/home/user/project",
@@ -71,6 +75,7 @@ describe("parseConfig", () => {
           readOnly: true,
         },
       ],
+      workdir: "/",
     });
   });
 
@@ -81,7 +86,9 @@ describe("parseConfig", () => {
     };
     expect(parseConfig(raw)).toEqual({
       rootfs: { ociImage: { tag: "ubuntu:latest" }, fsSize: 2048 },
+      user: "root",
       mounts: [{ hostPath: "../myproject", readOnly: false }],
+      workdir: "/",
     });
   });
 
@@ -112,5 +119,61 @@ describe("parseConfig", () => {
   test("rejects invalid input", () => {
     expect(() => parseConfig("not an object")).toThrow();
     expect(() => parseConfig({ rootfs: { ociImage: {} } })).toThrow();
+  });
+
+  test("parses workdir as absolute guest path string", () => {
+    const raw = {
+      rootfs: { ociImage: { tag: "ubuntu:latest" } },
+      workdir: "/workspace",
+    };
+    expect(parseConfig(raw)).toEqual({
+      rootfs: { ociImage: { tag: "ubuntu:latest" }, fsSize: 2048 },
+      user: "root",
+      workdir: "/workspace",
+    });
+  });
+
+  test("parses workdir as MountConfig with hostPath only", () => {
+    const raw = {
+      rootfs: { ociImage: { tag: "ubuntu:latest" } },
+      workdir: { hostPath: "/host/project" },
+    };
+    expect(parseConfig(raw)).toEqual({
+      rootfs: { ociImage: { tag: "ubuntu:latest" }, fsSize: 2048 },
+      user: "root",
+      workdir: { hostPath: "/host/project", readOnly: false },
+    });
+  });
+
+  test("parses workdir as MountConfig with guestPath", () => {
+    const raw = {
+      rootfs: { ociImage: { tag: "ubuntu:latest" } },
+      workdir: { hostPath: "/host/project", guestPath: "/workspace" },
+    };
+    expect(parseConfig(raw)).toEqual({
+      rootfs: { ociImage: { tag: "ubuntu:latest" }, fsSize: 2048 },
+      user: "root",
+      workdir: {
+        hostPath: "/host/project",
+        guestPath: "/workspace",
+        readOnly: false,
+      },
+    });
+  });
+
+  test("rejects workdir with non-absolute guest path string", () => {
+    const raw = {
+      rootfs: { ociImage: { tag: "ubuntu:latest" } },
+      workdir: "relative/path",
+    };
+    expect(() => parseConfig(raw)).toThrow();
+  });
+
+  test("rejects workdir with empty string", () => {
+    const raw = {
+      rootfs: { ociImage: { tag: "ubuntu:latest" } },
+      workdir: "",
+    };
+    expect(() => parseConfig(raw)).toThrow();
   });
 });
