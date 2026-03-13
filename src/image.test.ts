@@ -7,8 +7,6 @@ import {
 import type { ImageDeps } from "./image.ts";
 import type { RootfsConfig } from "./config.ts";
 
-const DEFAULT_ROOTFS_SIZE_MB = 2048;
-
 function stubDeps(overrides: Partial<ImageDeps> = {}): ImageDeps {
   return {
     detectEngine: async () => "docker",
@@ -21,7 +19,7 @@ function stubDeps(overrides: Partial<ImageDeps> = {}): ImageDeps {
 
 describe("gondolinTagFromDockerImageId", () => {
   test("produces deterministic tag from image id and size", () => {
-    const tag = gondolinTagFromDockerImageId("sha256:abcdef123456789abcdef", DEFAULT_ROOTFS_SIZE_MB);
+    const tag = gondolinTagFromDockerImageId("sha256:abcdef123456789abcdef", 2048);
     expect(tag).toMatch(/^tuor:[0-9a-f]{12}$/);
   });
 
@@ -46,7 +44,7 @@ describe("gondolinTagFromDockerImageId", () => {
 
 describe("gondolinTagFromOciRef", () => {
   test("produces deterministic tag from oci reference", () => {
-    const tag = gondolinTagFromOciRef("docker.io/ubuntu:latest", DEFAULT_ROOTFS_SIZE_MB);
+    const tag = gondolinTagFromOciRef("docker.io/ubuntu:latest", 2048);
     expect(tag).toMatch(/^tuor-oci:[0-9a-f]{12}$/);
   });
 
@@ -79,8 +77,8 @@ describe("resolveImage", () => {
       },
     });
 
-    const rootfs: RootfsConfig = { ociImage: { tag: "docker.io/ubuntu:latest" } };
-    const expectedTag = gondolinTagFromOciRef("docker.io/ubuntu:latest", DEFAULT_ROOTFS_SIZE_MB);
+    const rootfs: RootfsConfig = { ociImage: { tag: "docker.io/ubuntu:latest" }, fsSize: 2048 };
+    const expectedTag = gondolinTagFromOciRef("docker.io/ubuntu:latest", 2048);
     const result = await resolveImage(rootfs, "/project/.tuor", deps);
 
     expect(result).toBe(expectedTag);
@@ -96,10 +94,10 @@ describe("resolveImage", () => {
       },
     });
 
-    const rootfs: RootfsConfig = { ociImage: { tag: "docker.io/ubuntu:latest" } };
+    const rootfs: RootfsConfig = { ociImage: { tag: "docker.io/ubuntu:latest" }, fsSize: 2048 };
     const result = await resolveImage(rootfs, "/project/.tuor", deps);
 
-    expect(result).toBe(gondolinTagFromOciRef("docker.io/ubuntu:latest", DEFAULT_ROOTFS_SIZE_MB));
+    expect(result).toBe(gondolinTagFromOciRef("docker.io/ubuntu:latest", 2048));
     expect(calls).toEqual([]);
   });
 
@@ -118,6 +116,7 @@ describe("resolveImage", () => {
 
     const rootfs: RootfsConfig = {
       ociImage: { containerfile: "./Containerfile", engine: "podman" },
+      fsSize: 2048,
     };
     await resolveImage(rootfs, "/project/.tuor", deps);
 
@@ -135,7 +134,7 @@ describe("resolveImage", () => {
       gondolinImageExists: () => true,
     });
 
-    const rootfs: RootfsConfig = { ociImage: { containerfile: "./Containerfile" } };
+    const rootfs: RootfsConfig = { ociImage: { containerfile: "./Containerfile" }, fsSize: 2048 };
     await resolveImage(rootfs, "/project/.tuor", deps);
 
     expect(capturedEngine).toBe("docker");
@@ -172,10 +171,10 @@ describe("resolveImage", () => {
       },
     });
 
-    const rootfs: RootfsConfig = { ociImage: { containerfile: "./Containerfile" } };
+    const rootfs: RootfsConfig = { ociImage: { containerfile: "./Containerfile" }, fsSize: 2048 };
     const result = await resolveImage(rootfs, "/project/.tuor", deps);
 
-    const expectedTag = gondolinTagFromDockerImageId("sha256:aabbccddee11223344", DEFAULT_ROOTFS_SIZE_MB);
+    const expectedTag = gondolinTagFromDockerImageId("sha256:aabbccddee11223344", 2048);
     expect(result).toBe(expectedTag);
     expect(calls).toEqual([
       "build:docker:/project/.tuor/Containerfile:/project/.tuor",
@@ -196,10 +195,10 @@ describe("resolveImage", () => {
       },
     });
 
-    const rootfs: RootfsConfig = { ociImage: { containerfile: "./Containerfile" } };
+    const rootfs: RootfsConfig = { ociImage: { containerfile: "./Containerfile" }, fsSize: 2048 };
     const result = await resolveImage(rootfs, "/project/.tuor", deps);
 
-    const expectedTag = gondolinTagFromDockerImageId("sha256:aabbccddee11223344", DEFAULT_ROOTFS_SIZE_MB);
+    const expectedTag = gondolinTagFromDockerImageId("sha256:aabbccddee11223344", 2048);
     expect(result).toBe(expectedTag);
     expect(calls).toEqual(["docker-build"]);
   });
@@ -216,6 +215,7 @@ describe("resolveImage", () => {
 
     const rootfs: RootfsConfig = {
       ociImage: { containerfile: "./Containerfile", context: "./build-ctx" },
+      fsSize: 2048,
     };
     await resolveImage(rootfs, "/project/.tuor", deps);
 
@@ -232,7 +232,7 @@ describe("resolveImage", () => {
       gondolinImageExists: () => true,
     });
 
-    const rootfs: RootfsConfig = { ociImage: { containerfile: "./subdir/Containerfile" } };
+    const rootfs: RootfsConfig = { ociImage: { containerfile: "./subdir/Containerfile" }, fsSize: 2048 };
     await resolveImage(rootfs, "/project/.tuor", deps);
 
     expect(capturedContext).toBe("/project/.tuor/subdir");

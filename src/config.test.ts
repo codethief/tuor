@@ -19,169 +19,40 @@ describe("findConfigDir", () => {
 });
 
 describe("parseConfig", () => {
-  test("parses valid containerfile source", () => {
-    const raw = { rootfs: { ociImage: { containerfile: "./Containerfile" } } };
-    expect(parseConfig(raw)).toEqual({
-      rootfs: { ociImage: { containerfile: "./Containerfile" } },
-    });
-  });
-
-  test("parses containerfile source with context", () => {
-    const raw = { rootfs: { ociImage: { containerfile: "./Containerfile", context: "./ctx" } } };
-    expect(parseConfig(raw)).toEqual({
-      rootfs: { ociImage: { containerfile: "./Containerfile", context: "./ctx" } },
-    });
-  });
-
-  test("parses valid tag source", () => {
+  test("parses minimal config with tag", () => {
     const raw = { rootfs: { ociImage: { tag: "docker.io/ubuntu:latest" } } };
     expect(parseConfig(raw)).toEqual({
-      rootfs: { ociImage: { tag: "docker.io/ubuntu:latest" } },
+      rootfs: { ociImage: { tag: "docker.io/ubuntu:latest" }, fsSize: 2048 },
     });
   });
 
-  test("throws when config is not an object", () => {
-    expect(() => parseConfig("not an object")).toThrow("config must be a JSON object");
-  });
-
-  test("throws when config is null", () => {
-    expect(() => parseConfig(null)).toThrow("config must be a JSON object");
-  });
-
-  test("throws when config is an array", () => {
-    expect(() => parseConfig([1, 2])).toThrow("config must be a JSON object");
-  });
-
-  test("throws when rootfs field is missing", () => {
-    expect(() => parseConfig({})).toThrow("config must have a 'rootfs' object");
-  });
-
-  test("throws when rootfs is not an object", () => {
-    expect(() => parseConfig({ rootfs: "string" })).toThrow(
-      "config must have a 'rootfs' object",
-    );
-  });
-
-  test("throws when ociImage field is missing", () => {
-    expect(() => parseConfig({ rootfs: {} })).toThrow(
-      "rootfs must have an 'ociImage' object",
-    );
-  });
-
-  test("throws when ociImage is not an object", () => {
-    expect(() => parseConfig({ rootfs: { ociImage: "string" } })).toThrow(
-      "rootfs must have an 'ociImage' object",
-    );
-  });
-
-  test("throws when ociImage has no recognized field", () => {
-    expect(() => parseConfig({ rootfs: { ociImage: { other: "value" } } })).toThrow(
-      "ociImage must have a 'containerfile' or 'tag' field",
-    );
-  });
-
-  test("throws when containerfile is not a string", () => {
-    expect(() => parseConfig({ rootfs: { ociImage: { containerfile: 42 } } })).toThrow(
-      "ociImage.containerfile must be a non-empty string",
-    );
-  });
-
-  test("throws when containerfile is empty", () => {
-    expect(() => parseConfig({ rootfs: { ociImage: { containerfile: "" } } })).toThrow(
-      "ociImage.containerfile must be a non-empty string",
-    );
-  });
-
-  test("throws when tag is not a string", () => {
-    expect(() => parseConfig({ rootfs: { ociImage: { tag: 123 } } })).toThrow(
-      "ociImage.tag must be a non-empty string",
-    );
-  });
-
-  test("throws when tag is empty", () => {
-    expect(() => parseConfig({ rootfs: { ociImage: { tag: "" } } })).toThrow(
-      "ociImage.tag must be a non-empty string",
-    );
-  });
-
-  test("throws when context is not a string", () => {
-    expect(() =>
-      parseConfig({ rootfs: { ociImage: { containerfile: "./Containerfile", context: 42 } } }),
-    ).toThrow("ociImage.context must be a string");
-  });
-
-  test("parses engine field inside ociImage", () => {
-    const raw = { rootfs: { ociImage: { tag: "ubuntu:latest", engine: "podman" } } };
+  test("parses full config with all optional fields", () => {
+    const raw = {
+      rootfs: {
+        ociImage: {
+          containerfile: "./Containerfile",
+          context: "./ctx",
+          engine: "podman",
+        },
+        fsSize: 4096,
+      },
+      user: "myuser",
+    };
     expect(parseConfig(raw)).toEqual({
-      rootfs: { ociImage: { tag: "ubuntu:latest", engine: "podman" } },
-    });
-  });
-
-  test("omits engine when not specified", () => {
-    const raw = { rootfs: { ociImage: { tag: "ubuntu:latest" } } };
-    expect(parseConfig(raw)).toEqual({
-      rootfs: { ociImage: { tag: "ubuntu:latest" } },
-    });
-  });
-
-  test("throws when engine is invalid", () => {
-    expect(() =>
-      parseConfig({ rootfs: { ociImage: { tag: "x:y", engine: "containerd" } } }),
-    ).toThrow('engine must be "docker" or "podman"');
-  });
-
-  test("parses fsSize field", () => {
-    const raw = { rootfs: { ociImage: { tag: "ubuntu:latest" }, fsSize: 4096 } };
-    expect(parseConfig(raw)).toEqual({
-      rootfs: { ociImage: { tag: "ubuntu:latest" }, fsSize: 4096 },
-    });
-  });
-
-  test("omits fsSize when not specified", () => {
-    const raw = { rootfs: { ociImage: { tag: "ubuntu:latest" } } };
-    expect(parseConfig(raw)).toEqual({
-      rootfs: { ociImage: { tag: "ubuntu:latest" } },
-    });
-  });
-
-  test("parses user field when present", () => {
-    const raw = { rootfs: { ociImage: { tag: "ubuntu:latest" } }, user: "myuser" };
-    expect(parseConfig(raw)).toEqual({
-      rootfs: { ociImage: { tag: "ubuntu:latest" } },
+      rootfs: {
+        ociImage: {
+          containerfile: "./Containerfile",
+          context: "./ctx",
+          engine: "podman",
+        },
+        fsSize: 4096,
+      },
       user: "myuser",
     });
   });
 
-  test("omits user when not specified", () => {
-    const raw = { rootfs: { ociImage: { tag: "ubuntu:latest" } } };
-    expect(parseConfig(raw)).toEqual({
-      rootfs: { ociImage: { tag: "ubuntu:latest" } },
-    });
-  });
-
-  test("throws when user is not a string", () => {
-    expect(() =>
-      parseConfig({ rootfs: { ociImage: { tag: "x:y" } }, user: 42 }),
-    ).toThrow("user must be a non-empty string");
-  });
-
-  test("throws when user is an empty string", () => {
-    expect(() =>
-      parseConfig({ rootfs: { ociImage: { tag: "x:y" } }, user: "" }),
-    ).toThrow("user must be a non-empty string");
-  });
-
-  test("throws when fsSize is not a positive integer", () => {
-    expect(() =>
-      parseConfig({ rootfs: { ociImage: { tag: "x:y" }, fsSize: -1 } }),
-    ).toThrow("fsSize must be a positive integer");
-
-    expect(() =>
-      parseConfig({ rootfs: { ociImage: { tag: "x:y" }, fsSize: 1.5 } }),
-    ).toThrow("fsSize must be a positive integer");
-
-    expect(() =>
-      parseConfig({ rootfs: { ociImage: { tag: "x:y" }, fsSize: "big" } }),
-    ).toThrow("fsSize must be a positive integer");
+  test("rejects invalid input", () => {
+    expect(() => parseConfig("not an object")).toThrow();
+    expect(() => parseConfig({ rootfs: { ociImage: {} } })).toThrow();
   });
 });

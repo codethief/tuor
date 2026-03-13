@@ -14,8 +14,6 @@ import {
 } from "@earendil-works/gondolin";
 import type { ContainerEngine, OciImage, RootfsConfig } from "./config.ts";
 
-const DEFAULT_ROOTFS_SIZE_MB = 2048;
-
 // --- Pure helpers ---
 
 function buildTagHash(...parts: (string | number)[]): string {
@@ -56,13 +54,12 @@ async function resolveImage(
   deps: ImageDeps = defaultImageDeps,
 ): Promise<string> {
   const { ociImage } = rootfs;
-  const effectiveSizeMb = rootfs.fsSize ?? DEFAULT_ROOTFS_SIZE_MB;
 
   if ("tag" in ociImage) {
     const { engine } = ociImage;
-    const tag = gondolinTagFromOciRef(ociImage.tag, effectiveSizeMb);
+    const tag = gondolinTagFromOciRef(ociImage.tag, rootfs.fsSize);
     if (!deps.gondolinImageExists(tag)) {
-      await deps.buildGondolinImage(ociImage.tag, tag, engine, effectiveSizeMb);
+      await deps.buildGondolinImage(ociImage.tag, tag, engine, rootfs.fsSize);
     }
     return tag;
   }
@@ -79,10 +76,10 @@ async function resolveImage(
     contextPath,
   );
 
-  const tag = gondolinTagFromDockerImageId(imageId, effectiveSizeMb);
+  const tag = gondolinTagFromDockerImageId(imageId, rootfs.fsSize);
 
   if (!deps.gondolinImageExists(tag)) {
-    await deps.buildGondolinImage(imageId, tag, resolvedEngine, effectiveSizeMb);
+    await deps.buildGondolinImage(imageId, tag, resolvedEngine, rootfs.fsSize);
   }
 
   return tag;
