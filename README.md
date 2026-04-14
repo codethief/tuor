@@ -17,10 +17,7 @@ my personal workflow.
 
 
 # General dependencies
-- `gondolin build`
-  [dependencies](https://earendil-works.github.io/gondolin/custom-images/#build-requirements)
 - Gondolin runtime dependencies (QEMU)
-- Docker or Podman to build and/or retrieve container images
 
 
 # Usage
@@ -28,17 +25,11 @@ I haven't gotten around packaging Tuor yet; please see the development
 instructions below for installation instructions.
 
 Tuor looks for a `.tuor/config.json` file in the current working directory to
-configure the VM. Example config:
+configure the VM. It uses Gondolin's default Alpine-based image and layers
+host-side mounts on top. Example config:
 
 ```javascript
 {
-  "rootfs": {
-    "ociImage": {
-      "containerfile": "./Dockerfile",  // relative to config.json
-      "engine": "docker"  // or "podman"
-    },
-    "fsSize": 4096  // Total rootfs size, including OCI image
-  },
   "user": "root",  // User must currently be root or the user with UID 1000 (or whatever UID you use on the host), see https://github.com/earendil-works/gondolin/issues/74
   "workdir": {
       "hostPath": "..",  // relative to config.json
@@ -53,13 +44,6 @@ configure the VM. Example config:
   ]
 }
 ```
-
-With this config, Tuor will 
-- build the Dockerfile using Docker, 
-- pass the resulting container image to `gondolin build` to build a VM image
-  ([using the container image as
-  rootfs](https://earendil-works.github.io/gondolin/custom-images/#oci-support)),
-- configure Gondolin and start the VM.
 
 
 # Development

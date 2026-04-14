@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { VM } from "@earendil-works/gondolin";
 import { findConfigDir, parseConfig } from "./config.ts";
-import { resolveImage } from "./image.ts";
 import { prepareMounts } from "./mounts.ts";
 import { resolveWorkdir } from "./workdir.ts";
 
@@ -17,7 +16,6 @@ if (!configDir) {
 
 const raw = JSON.parse(readFileSync(join(configDir, "config.json"), "utf-8"));
 const config = parseConfig(raw);
-const imageTag = await resolveImage(config.rootfs, configDir);
 
 const workdir = resolveWorkdir(config.workdir, configDir);
 
@@ -29,7 +27,6 @@ const vfsMounts =
   allMounts.length > 0 ? prepareMounts(allMounts, configDir) : undefined;
 
 const vm = await VM.create({
-  sandbox: { imagePath: imageTag },
   dns: { mode: "open" },
   ...(vfsMounts ? { vfs: { mounts: vfsMounts } } : {}),
 });

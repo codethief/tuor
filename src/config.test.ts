@@ -19,36 +19,17 @@ describe("findConfigDir", () => {
 });
 
 describe("parseConfig", () => {
-  test("parses minimal config with tag", () => {
-    const raw = { rootfs: { ociImage: { tag: "docker.io/ubuntu:latest" } } };
+  test("parses minimal config (all defaults)", () => {
+    const raw = {};
     expect(parseConfig(raw)).toEqual({
-      rootfs: { ociImage: { tag: "docker.io/ubuntu:latest" }, fsSize: 2048 },
       user: "root",
       workdir: "/",
     });
   });
 
-  test("parses full config with all optional fields", () => {
-    const raw = {
-      rootfs: {
-        ociImage: {
-          containerfile: "./Containerfile",
-          context: "./ctx",
-          engine: "podman",
-        },
-        fsSize: 4096,
-      },
-      user: "myuser",
-    };
+  test("parses config with user", () => {
+    const raw = { user: "myuser" };
     expect(parseConfig(raw)).toEqual({
-      rootfs: {
-        ociImage: {
-          containerfile: "./Containerfile",
-          context: "./ctx",
-          engine: "podman",
-        },
-        fsSize: 4096,
-      },
       user: "myuser",
       workdir: "/",
     });
@@ -56,7 +37,6 @@ describe("parseConfig", () => {
 
   test("parses mounts with all fields", () => {
     const raw = {
-      rootfs: { ociImage: { tag: "ubuntu:latest" } },
       mounts: [
         {
           hostPath: "/home/user/project",
@@ -66,7 +46,6 @@ describe("parseConfig", () => {
       ],
     };
     expect(parseConfig(raw)).toEqual({
-      rootfs: { ociImage: { tag: "ubuntu:latest" }, fsSize: 2048 },
       user: "root",
       mounts: [
         {
@@ -81,11 +60,9 @@ describe("parseConfig", () => {
 
   test("parses mounts with hostPath only, readOnly defaults to false", () => {
     const raw = {
-      rootfs: { ociImage: { tag: "ubuntu:latest" } },
       mounts: [{ hostPath: "../myproject" }],
     };
     expect(parseConfig(raw)).toEqual({
-      rootfs: { ociImage: { tag: "ubuntu:latest" }, fsSize: 2048 },
       user: "root",
       mounts: [{ hostPath: "../myproject", readOnly: false }],
       workdir: "/",
@@ -94,7 +71,6 @@ describe("parseConfig", () => {
 
   test("rejects mounts with relative guestPath", () => {
     const raw = {
-      rootfs: { ociImage: { tag: "ubuntu:latest" } },
       mounts: [{ hostPath: "/foo", guestPath: "relative/path" }],
     };
     expect(() => parseConfig(raw)).toThrow();
@@ -102,7 +78,6 @@ describe("parseConfig", () => {
 
   test("rejects mounts with empty hostPath", () => {
     const raw = {
-      rootfs: { ociImage: { tag: "ubuntu:latest" } },
       mounts: [{ hostPath: "" }],
     };
     expect(() => parseConfig(raw)).toThrow();
@@ -110,7 +85,6 @@ describe("parseConfig", () => {
 
   test("rejects mounts with non-string hostPath", () => {
     const raw = {
-      rootfs: { ociImage: { tag: "ubuntu:latest" } },
       mounts: [{ hostPath: 123 }],
     };
     expect(() => parseConfig(raw)).toThrow();
@@ -118,16 +92,13 @@ describe("parseConfig", () => {
 
   test("rejects invalid input", () => {
     expect(() => parseConfig("not an object")).toThrow();
-    expect(() => parseConfig({ rootfs: { ociImage: {} } })).toThrow();
   });
 
   test("parses workdir as absolute guest path string", () => {
     const raw = {
-      rootfs: { ociImage: { tag: "ubuntu:latest" } },
       workdir: "/workspace",
     };
     expect(parseConfig(raw)).toEqual({
-      rootfs: { ociImage: { tag: "ubuntu:latest" }, fsSize: 2048 },
       user: "root",
       workdir: "/workspace",
     });
@@ -135,11 +106,9 @@ describe("parseConfig", () => {
 
   test("parses workdir as MountConfig with hostPath only", () => {
     const raw = {
-      rootfs: { ociImage: { tag: "ubuntu:latest" } },
       workdir: { hostPath: "/host/project" },
     };
     expect(parseConfig(raw)).toEqual({
-      rootfs: { ociImage: { tag: "ubuntu:latest" }, fsSize: 2048 },
       user: "root",
       workdir: { hostPath: "/host/project", readOnly: false },
     });
@@ -147,11 +116,9 @@ describe("parseConfig", () => {
 
   test("parses workdir as MountConfig with guestPath", () => {
     const raw = {
-      rootfs: { ociImage: { tag: "ubuntu:latest" } },
       workdir: { hostPath: "/host/project", guestPath: "/workspace" },
     };
     expect(parseConfig(raw)).toEqual({
-      rootfs: { ociImage: { tag: "ubuntu:latest" }, fsSize: 2048 },
       user: "root",
       workdir: {
         hostPath: "/host/project",
@@ -163,7 +130,6 @@ describe("parseConfig", () => {
 
   test("rejects workdir with non-absolute guest path string", () => {
     const raw = {
-      rootfs: { ociImage: { tag: "ubuntu:latest" } },
       workdir: "relative/path",
     };
     expect(() => parseConfig(raw)).toThrow();
@@ -171,7 +137,6 @@ describe("parseConfig", () => {
 
   test("rejects workdir with empty string", () => {
     const raw = {
-      rootfs: { ociImage: { tag: "ubuntu:latest" } },
       workdir: "",
     };
     expect(() => parseConfig(raw)).toThrow();

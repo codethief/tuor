@@ -5,26 +5,6 @@ import { scope, type } from "arktype";
 // --- Schema (single source of truth for validation + types) ---
 
 const types = scope({
-  ContainerEngine: "'docker' | 'podman'",
-  OciImageRef: {
-    tag: "string > 0",
-    "engine?": "ContainerEngine",
-  },
-  OciImageBuild: {
-    containerfile: "string > 0",
-    "context?": "string",
-    "engine?": "ContainerEngine",
-  },
-  OciImage: "OciImageRef | OciImageBuild",
-  /**
-   * Total size of the rootfs ext4 image in MB. This is not additional space on
-   * top of the OCI/Dockerfile contents — the entire filesystem must fit within
-   * this budget. Defaults to 2048 MB.
-   */
-  RootfsConfig: {
-    ociImage: "OciImage",
-    "fsSize": "number.integer > 0 = 2048",
-  },
   AbsoluteGuestPath: type("string > 0").matching(/^\//),
   MountConfig: {
     hostPath: "string > 0",
@@ -38,29 +18,18 @@ const types = scope({
    */
   WorkdirConfig: "AbsoluteGuestPath | MountConfig",
   TuorConfig: {
-    rootfs: "RootfsConfig",
     "user": "string > 0 = 'root'",
     "mounts?": "MountConfig[]",
     "workdir": "WorkdirConfig = '/'",
   },
 }).export();
 
-type ContainerEngine = typeof types.ContainerEngine.infer;
-type OciImageRef = typeof types.OciImageRef.infer;
-type OciImageBuild = typeof types.OciImageBuild.infer;
-type OciImage = typeof types.OciImage.infer;
-type RootfsConfig = typeof types.RootfsConfig.infer;
 type MountConfig = typeof types.MountConfig.infer;
 type WorkdirConfig = typeof types.WorkdirConfig.infer;
 type TuorConfig = typeof types.TuorConfig.infer;
 
 export type {
-  ContainerEngine,
   MountConfig,
-  OciImage,
-  OciImageBuild,
-  OciImageRef,
-  RootfsConfig,
   TuorConfig,
   WorkdirConfig,
 };
