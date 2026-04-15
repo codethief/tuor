@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { VM } from "@earendil-works/gondolin";
 import { findConfigDir, parseConfig } from "./config.ts";
 import { prepareMounts } from "./mounts.ts";
+import { resolveNixSetup } from "./nix.ts";
 import { resolveWorkdir } from "./workdir.ts";
 
 const configDir = findConfigDir(process.cwd());
@@ -17,9 +18,11 @@ if (!configDir) {
 const raw = JSON.parse(readFileSync(join(configDir, "config.json"), "utf-8"));
 const config = parseConfig(raw);
 
+const nixSetup = config.nix ? resolveNixSetup(config.nix) : undefined;
 const workdir = resolveWorkdir(config.workdir, configDir);
 
 const allMounts = [
+  ...(nixSetup?.mounts ?? []),
   ...(config.mounts ?? []),
   ...(workdir.mount ? [workdir.mount] : []),
 ];
@@ -28,8 +31,14 @@ const vfsMounts =
 
 const vm = await VM.create({
   dns: { mode: "open" },
+  ...(nixSetup ? { env: nixSetup.env } : {}),
   ...(vfsMounts ? { vfs: { mounts: vfsMounts } } : {}),
 });
+
+if (nixSetup) {
+  await vm.exec(nixSetup.tlsSetupCommand);
+}
+
 await vm.shell({
   attach: true,
   // `su myuser` gives us an interactive non-login shell (`su - myuser` would

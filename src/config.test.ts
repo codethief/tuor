@@ -141,4 +141,41 @@ describe("parseConfig", () => {
     };
     expect(() => parseConfig(raw)).toThrow();
   });
+
+  test("parses nix config with profiles", () => {
+    const raw = {
+      nix: { profiles: ["/nix/var/nix/profiles/default", "/nix/store/abc-env"] },
+    };
+    expect(parseConfig(raw)).toEqual({
+      user: "root",
+      workdir: "/",
+      nix: {
+        profiles: ["/nix/var/nix/profiles/default", "/nix/store/abc-env"],
+        nixLd: false,
+      },
+    });
+  });
+
+  test("parses nix config with nixLd", () => {
+    const raw = { nix: { nixLd: true } };
+    expect(parseConfig(raw)).toEqual({
+      user: "root",
+      workdir: "/",
+      nix: { nixLd: true },
+    });
+  });
+
+  test("accepts nix profile paths outside /nix/ (validated at runtime via symlink resolution)", () => {
+    const raw = { nix: { profiles: ["/run/current-system/sw"] } };
+    expect(parseConfig(raw)).toEqual({
+      user: "root",
+      workdir: "/",
+      nix: { profiles: ["/run/current-system/sw"], nixLd: false },
+    });
+  });
+
+  test("rejects nix profile with relative path", () => {
+    const raw = { nix: { profiles: ["relative/path"] } };
+    expect(() => parseConfig(raw)).toThrow();
+  });
 });

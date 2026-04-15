@@ -4,20 +4,29 @@ import { scope, type } from "arktype";
 
 // --- Schema (single source of truth for validation + types) ---
 
+const AbsolutePath = type("string > 0").matching(/^\//);
+
 const types = scope({
-  AbsoluteGuestPath: type("string > 0").matching(/^\//),
+  AbsolutePath,
   MountConfig: {
     hostPath: "string > 0",
-    "guestPath?": "AbsoluteGuestPath",
+    "guestPath?": "AbsolutePath",
     "readOnly": "boolean = false",
+  },
+  NixConfig: {
+    /** Nix profile paths whose bin/ dirs go on PATH (must resolve to /nix/ via symlinks). Auto-detected from $NIX_PROFILES if omitted. */
+    "profiles?": "AbsolutePath[]",
+    /** Mount /lib64 for nix-ld dynamic linker support. */
+    "nixLd": "boolean = false",
   },
   /**
    * Working directory inside the guest. Either just a guest path (string) to cd
    * into, or a full mount config (which also sets up the host→guest mount and
    * then cd's into the guest path).
    */
-  WorkdirConfig: "AbsoluteGuestPath | MountConfig",
+  WorkdirConfig: "AbsolutePath | MountConfig",
   TuorConfig: {
+    "nix?": "NixConfig",
     "user": "string > 0 = 'root'",
     "mounts?": "MountConfig[]",
     "workdir": "WorkdirConfig = '/'",
@@ -25,11 +34,13 @@ const types = scope({
 }).export();
 
 type MountConfig = typeof types.MountConfig.infer;
+type NixConfig = typeof types.NixConfig.infer;
 type WorkdirConfig = typeof types.WorkdirConfig.infer;
 type TuorConfig = typeof types.TuorConfig.infer;
 
 export type {
   MountConfig,
+  NixConfig,
   TuorConfig,
   WorkdirConfig,
 };
