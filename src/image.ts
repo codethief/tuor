@@ -187,6 +187,7 @@ async function buildGondolinImage(
   config.sandboxsshPath = binaries["sandboxssh"];
   config.sandboxingressPath = binaries["sandboxingress"];
 
+  // TODO Clean up temp dir right away because the builds get large.
   const outputDir = mkdtempSync(join(tmpdir(), "tuor-build-"));
   const result = await buildAssets(config, { outputDir });
 
