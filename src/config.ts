@@ -9,14 +9,24 @@ const AbsolutePath = type("string > 0").matching(/^\//);
 const types = scope({
   AbsolutePath,
   MountConfig: {
+    /** Absolute path or path relative to directory containing config file */
     hostPath: "string > 0",
+    /** If guestPath is not given explicitly, it will be the same path as on the host. */
     "guestPath?": "AbsolutePath",
+    /** Whether or not the guest can modify the files in the mounted directory. */
     "readOnly": "boolean = false",
   },
+  /**
+   * When Nix support is enabled (by providing a NixConfig via `config.nix`),
+   * the host's /nix will be mounted read-only into the guest.
+   */
   NixConfig: {
-    /** Nix profile paths whose bin/ dirs go on PATH (must resolve to /nix/ via symlinks). Auto-detected from $NIX_PROFILES if omitted. */
+    /**
+     * Nix profile paths whose bin/ dirs go on PATH (must resolve to /nix/ via
+     * symlinks). Auto-detected from $NIX_PROFILES if omitted.
+     */
     "profiles?": "AbsolutePath[]",
-    /** Mount /lib64 for nix-ld dynamic linker support. */
+    /** Mount /lib64 (read-only) for nix-ld dynamic linker support. */
     "nixLd": "boolean = false",
   },
   /**
@@ -26,7 +36,12 @@ const types = scope({
    */
   WorkdirConfig: "AbsolutePath | MountConfig",
   TuorConfig: {
+    /**
+     * When `nix` is given (even if "empty", i.e. just {}), Nix support will be
+     * enabled.
+     */
     "nix?": "NixConfig",
+    /** The user to open the shell under and to make mounted directories available for. */
     "user": "string > 0 = 'root'",
     "mounts?": "MountConfig[]",
     "workdir": "WorkdirConfig = '/'",
