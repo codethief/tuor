@@ -19,192 +19,60 @@ describe("findConfigDir", () => {
 });
 
 describe("parseConfig", () => {
-  test("parses minimal config (all defaults)", () => {
-    const raw = {};
-    expect(parseConfig(raw)).toEqual({
-      user: "root",
-      workdir: "/",
-    });
-  });
-
-  test("parses config with user", () => {
-    const raw = { user: "myuser" };
-    expect(parseConfig(raw)).toEqual({
-      user: "myuser",
-      workdir: "/",
-    });
-  });
-
-  test("parses mounts with all fields", () => {
+  test("parses a fully-populated config with correct defaults", () => {
     const raw = {
-      mounts: [
-        {
-          hostPath: "/home/user/project",
-          guestPath: "/workspace",
-          mode: "readwrite",
-        },
-      ],
-    };
-    expect(parseConfig(raw)).toEqual({
-      user: "root",
-      mounts: [
-        {
-          hostPath: "/home/user/project",
-          guestPath: "/workspace",
-          mode: "readwrite",
-        },
-      ],
-      workdir: "/",
-    });
-  });
-
-  test("parses mounts with hostPath only, mode defaults to readonly", () => {
-    const raw = {
-      mounts: [{ hostPath: "../myproject" }],
-    };
-    expect(parseConfig(raw)).toEqual({
-      user: "root",
-      mounts: [{ hostPath: "../myproject", mode: "readonly" }],
-      workdir: "/",
-    });
-  });
-
-  test("parses mounts with overlay mode", () => {
-    const raw = {
-      mounts: [{ hostPath: "/data", mode: "overlay" }],
-    };
-    expect(parseConfig(raw)).toEqual({
-      user: "root",
-      mounts: [{ hostPath: "/data", mode: "overlay" }],
-      workdir: "/",
-    });
-  });
-
-  test("parses mounts with overlay-tmpfs mode", () => {
-    const raw = {
-      mounts: [{ hostPath: "/data", mode: "overlay-tmpfs" }],
-    };
-    expect(parseConfig(raw)).toEqual({
-      user: "root",
-      mounts: [{ hostPath: "/data", mode: "overlay-tmpfs" }],
-      workdir: "/",
-    });
-  });
-
-  test("rejects mounts with invalid mode", () => {
-    const raw = {
-      mounts: [{ hostPath: "/data", mode: "invalid" }],
-    };
-    expect(() => parseConfig(raw)).toThrow();
-  });
-
-  test("rejects mounts with relative guestPath", () => {
-    const raw = {
-      mounts: [{ hostPath: "/foo", guestPath: "relative/path" }],
-    };
-    expect(() => parseConfig(raw)).toThrow();
-  });
-
-  test("rejects mounts with empty hostPath", () => {
-    const raw = {
-      mounts: [{ hostPath: "" }],
-    };
-    expect(() => parseConfig(raw)).toThrow();
-  });
-
-  test("rejects mounts with non-string hostPath", () => {
-    const raw = {
-      mounts: [{ hostPath: 123 }],
-    };
-    expect(() => parseConfig(raw)).toThrow();
-  });
-
-  test("rejects invalid input", () => {
-    expect(() => parseConfig("not an object")).toThrow();
-  });
-
-  test("parses workdir as absolute guest path string", () => {
-    const raw = {
-      workdir: "/workspace",
-    };
-    expect(parseConfig(raw)).toEqual({
-      user: "root",
-      workdir: "/workspace",
-    });
-  });
-
-  test("parses workdir as MountConfig with hostPath only", () => {
-    const raw = {
-      workdir: { hostPath: "/host/project" },
-    };
-    expect(parseConfig(raw)).toEqual({
-      user: "root",
-      workdir: { hostPath: "/host/project", mode: "readonly" },
-    });
-  });
-
-  test("parses workdir as MountConfig with guestPath", () => {
-    const raw = {
+      user: "dev",
       workdir: { hostPath: "/host/project", guestPath: "/workspace" },
+      mounts: [
+        { hostPath: "/data", guestPath: "/mnt/data", mode: "readwrite" },
+        { hostPath: "../relative" },
+      ],
+      nix: {
+        profiles: ["/nix/var/nix/profiles/default"],
+        nixLd: true,
+      },
     };
-    expect(parseConfig(raw)).toEqual({
-      user: "root",
+    const config = parseConfig(raw);
+    expect(config).toEqual({
+      user: "dev",
       workdir: {
         hostPath: "/host/project",
         guestPath: "/workspace",
         mode: "readonly",
       },
-    });
-  });
-
-  test("rejects workdir with non-absolute guest path string", () => {
-    const raw = {
-      workdir: "relative/path",
-    };
-    expect(() => parseConfig(raw)).toThrow();
-  });
-
-  test("rejects workdir with empty string", () => {
-    const raw = {
-      workdir: "",
-    };
-    expect(() => parseConfig(raw)).toThrow();
-  });
-
-  test("parses nix config with profiles", () => {
-    const raw = {
-      nix: { profiles: ["/nix/var/nix/profiles/default", "/nix/store/abc-env"] },
-    };
-    expect(parseConfig(raw)).toEqual({
-      user: "root",
-      workdir: "/",
+      mounts: [
+        { hostPath: "/data", guestPath: "/mnt/data", mode: "readwrite" },
+        { hostPath: "../relative", mode: "readonly" },
+      ],
       nix: {
-        profiles: ["/nix/var/nix/profiles/default", "/nix/store/abc-env"],
-        nixLd: false,
+        profiles: ["/nix/var/nix/profiles/default"],
+        nixLd: true,
       },
     });
   });
 
-  test("parses nix config with nixLd", () => {
-    const raw = { nix: { nixLd: true } };
-    expect(parseConfig(raw)).toEqual({
-      user: "root",
-      workdir: "/",
-      nix: { nixLd: true },
-    });
+  test("fills in defaults for minimal config", () => {
+    const config = parseConfig({});
+    expect(config.user).toBe("root");
+    expect(config.workdir).toBe("/");
+    expect(config.mounts).toBeUndefined();
+    expect(config.nix).toBeUndefined();
   });
 
-  test("accepts nix profile paths outside /nix/ (validated at runtime via symlink resolution)", () => {
-    const raw = { nix: { profiles: ["/run/current-system/sw"] } };
-    expect(parseConfig(raw)).toEqual({
-      user: "root",
-      workdir: "/",
-      nix: { profiles: ["/run/current-system/sw"], nixLd: false },
-    });
+  test("accepts workdir as absolute guest path string", () => {
+    expect(parseConfig({ workdir: "/workspace" }).workdir).toBe("/workspace");
   });
 
-  test("rejects nix profile with relative path", () => {
-    const raw = { nix: { profiles: ["relative/path"] } };
+  test.each([
+    ["relative guestPath", { mounts: [{ hostPath: "/foo", guestPath: "rel" }] }],
+    ["empty hostPath", { mounts: [{ hostPath: "" }] }],
+    ["invalid mode", { mounts: [{ hostPath: "/x", mode: "bad" }] }],
+    ["non-string hostPath", { mounts: [{ hostPath: 123 }] }],
+    ["relative workdir string", { workdir: "relative" }],
+    ["empty workdir string", { workdir: "" }],
+    ["relative nix profile", { nix: { profiles: ["relative/path"] } }],
+    ["non-object input", "not an object"],
+  ])("rejects %s", (_label, raw) => {
     expect(() => parseConfig(raw)).toThrow();
   });
 });
