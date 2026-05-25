@@ -56,6 +56,8 @@ function validateMounts(mounts: ResolvedMount[], deps: MountDeps): void {
   const seen = new Set<string>();
   for (const mount of mounts) {
     if (seen.has(mount.guestPath)) {
+      // TODO The check for equality is not enough. We should actually check
+      // that the different guestPaths don't contain each other.
       throw new Error(`Duplicate guest mount path: ${mount.guestPath}`);
     }
     seen.add(mount.guestPath);
