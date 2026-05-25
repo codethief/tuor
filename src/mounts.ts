@@ -1,18 +1,20 @@
-import { existsSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, mkdirSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
 import {
   RealFSProvider,
   ReadonlyProvider,
+  MemoryProvider,
   type VirtualProvider,
 } from "@earendil-works/gondolin";
-import type { MountConfig } from "./config.ts";
+import { OverlayProvider } from "./overlay-provider.ts";
+import type { MountConfig, MountMode } from "./config.ts";
 
 // --- Types ---
 
 type ResolvedMount = {
   hostPath: string;
   guestPath: string;
-  readOnly: boolean;
+  mode: MountMode;
 };
 
 type MountDeps = {
@@ -31,7 +33,7 @@ function resolveMounts(
     return {
       hostPath,
       guestPath: m.guestPath ?? hostPath,
-      readOnly: m.readOnly,
+      mode: m.mode,
     };
   });
 }
@@ -60,17 +62,44 @@ function validateMounts(mounts: ResolvedMount[], deps: MountDeps): void {
   }
 }
 
+// --- Helpers ---
+
+/** Compute the on-disk path for a persistent overlay's upper layer. */
+function getOverlayStateDir(configDir: string, guestPath: string): string {
+  const stripped = guestPath.replace(/^\//, "");
+  const sanitized = stripped === "" ? "_root" : stripped.replace(/\//g, "_");
+  return join(configDir, ".state", "overlays", sanitized);
+}
+
 // --- Imperative shell ---
 
 function buildVfsMounts(
   mounts: ResolvedMount[],
+  configDir: string,
 ): Record<string, VirtualProvider> {
   const result: Record<string, VirtualProvider> = {};
   for (const mount of mounts) {
-    const provider = new RealFSProvider(mount.hostPath);
-    result[mount.guestPath] = mount.readOnly
-      ? new ReadonlyProvider(provider)
-      : provider;
+    const backend = new RealFSProvider(mount.hostPath);
+    switch (mount.mode) {
+      case "readwrite":
+        result[mount.guestPath] = backend;
+        break;
+      case "readonly":
+        result[mount.guestPath] = new ReadonlyProvider(backend);
+        break;
+      case "overlay-tmpfs":
+        result[mount.guestPath] = new OverlayProvider(backend, new MemoryProvider());
+        break;
+      case "overlay": {
+        const stateDir = getOverlayStateDir(configDir, mount.guestPath);
+        mkdirSync(stateDir, { recursive: true });
+        result[mount.guestPath] = new OverlayProvider(
+          backend,
+          new RealFSProvider(stateDir),
+        );
+        break;
+      }
+    }
   }
   return result;
 }
@@ -89,8 +118,8 @@ function prepareMounts(
 ): Record<string, VirtualProvider> {
   const resolved = resolveMounts(mounts, configDir);
   validateMounts(resolved, deps);
-  return buildVfsMounts(resolved);
+  return buildVfsMounts(resolved, configDir);
 }
 
-export { resolveMounts, validateMounts, buildVfsMounts, prepareMounts };
+export { resolveMounts, validateMounts, buildVfsMounts, getOverlayStateDir, prepareMounts };
 export type { ResolvedMount, MountDeps };

@@ -8,13 +8,21 @@ const AbsolutePath = type("string > 0").matching(/^\//);
 
 const types = scope({
   AbsolutePath,
+  /**
+   * - readwrite: full read/write access to the host directory
+   * - readonly: host directory is mounted read-only
+   * - overlay: host directory is read-only, writes go to a persistent upper
+   *   layer stored in .tuor/.state/overlays/
+   * - overlay-tmpfs: like overlay but the upper layer is in-memory (lost on
+   *   VM shutdown)
+   */
+  MountMode: "'readwrite' | 'readonly' | 'overlay' | 'overlay-tmpfs'",
   MountConfig: {
     /** Absolute path or path relative to directory containing config file */
     hostPath: "string > 0",
     /** If guestPath is not given explicitly, it will be the same path as on the host. */
     "guestPath?": "AbsolutePath",
-    /** Whether or not the guest can modify the files in the mounted directory. */
-    "readOnly": "boolean = false",
+    "mode": "MountMode = 'readonly'",
   },
   /**
    * When Nix support is enabled (by providing a NixConfig via `config.nix`),
@@ -48,6 +56,7 @@ const types = scope({
   },
 }).export();
 
+type MountMode = typeof types.MountMode.infer;
 type MountConfig = typeof types.MountConfig.infer;
 type NixConfig = typeof types.NixConfig.infer;
 type WorkdirConfig = typeof types.WorkdirConfig.infer;
@@ -55,6 +64,7 @@ type TuorConfig = typeof types.TuorConfig.infer;
 
 export type {
   MountConfig,
+  MountMode,
   NixConfig,
   TuorConfig,
   WorkdirConfig,

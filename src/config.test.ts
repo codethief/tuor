@@ -41,7 +41,7 @@ describe("parseConfig", () => {
         {
           hostPath: "/home/user/project",
           guestPath: "/workspace",
-          readOnly: true,
+          mode: "readwrite",
         },
       ],
     };
@@ -51,22 +51,51 @@ describe("parseConfig", () => {
         {
           hostPath: "/home/user/project",
           guestPath: "/workspace",
-          readOnly: true,
+          mode: "readwrite",
         },
       ],
       workdir: "/",
     });
   });
 
-  test("parses mounts with hostPath only, readOnly defaults to false", () => {
+  test("parses mounts with hostPath only, mode defaults to readonly", () => {
     const raw = {
       mounts: [{ hostPath: "../myproject" }],
     };
     expect(parseConfig(raw)).toEqual({
       user: "root",
-      mounts: [{ hostPath: "../myproject", readOnly: false }],
+      mounts: [{ hostPath: "../myproject", mode: "readonly" }],
       workdir: "/",
     });
+  });
+
+  test("parses mounts with overlay mode", () => {
+    const raw = {
+      mounts: [{ hostPath: "/data", mode: "overlay" }],
+    };
+    expect(parseConfig(raw)).toEqual({
+      user: "root",
+      mounts: [{ hostPath: "/data", mode: "overlay" }],
+      workdir: "/",
+    });
+  });
+
+  test("parses mounts with overlay-tmpfs mode", () => {
+    const raw = {
+      mounts: [{ hostPath: "/data", mode: "overlay-tmpfs" }],
+    };
+    expect(parseConfig(raw)).toEqual({
+      user: "root",
+      mounts: [{ hostPath: "/data", mode: "overlay-tmpfs" }],
+      workdir: "/",
+    });
+  });
+
+  test("rejects mounts with invalid mode", () => {
+    const raw = {
+      mounts: [{ hostPath: "/data", mode: "invalid" }],
+    };
+    expect(() => parseConfig(raw)).toThrow();
   });
 
   test("rejects mounts with relative guestPath", () => {
@@ -110,7 +139,7 @@ describe("parseConfig", () => {
     };
     expect(parseConfig(raw)).toEqual({
       user: "root",
-      workdir: { hostPath: "/host/project", readOnly: false },
+      workdir: { hostPath: "/host/project", mode: "readonly" },
     });
   });
 
@@ -123,7 +152,7 @@ describe("parseConfig", () => {
       workdir: {
         hostPath: "/host/project",
         guestPath: "/workspace",
-        readOnly: false,
+        mode: "readonly",
       },
     });
   });

@@ -36,7 +36,7 @@ describe("resolveNixSetup", () => {
       expect(mounts).toContainEqual({
         hostPath: "/nix",
         guestPath: "/nix",
-        readOnly: true,
+        mode: "readonly",
       });
     });
 
@@ -50,7 +50,7 @@ describe("resolveNixSetup", () => {
       expect(mounts).toContainEqual({
         hostPath: "/lib64",
         guestPath: "/lib64",
-        readOnly: true,
+        mode: "readonly",
       });
     });
 

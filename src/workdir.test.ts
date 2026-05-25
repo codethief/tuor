@@ -14,7 +14,7 @@ describe("resolveWorkdir", () => {
 
   test("uses explicit guestPath from MountConfig", () => {
     const result = resolveWorkdir(
-      { hostPath: "/host/project", guestPath: "/guest/project", readOnly: false },
+      { hostPath: "/host/project", guestPath: "/guest/project", mode: "readonly" },
       "/any/configDir",
     );
     expect(result.guestPath).toBe("/guest/project");
@@ -22,7 +22,7 @@ describe("resolveWorkdir", () => {
 
   test("defaults guestPath to resolved hostPath when not specified", () => {
     const result = resolveWorkdir(
-      { hostPath: "../project", readOnly: false },
+      { hostPath: "../project", mode: "readonly" },
       "/home/user/.tuor",
     );
     expect(result.guestPath).toBe("/home/user/project");
@@ -30,7 +30,7 @@ describe("resolveWorkdir", () => {
 
   test("resolves relative hostPath against configDir", () => {
     const result = resolveWorkdir(
-      { hostPath: "..", readOnly: false },
+      { hostPath: "..", mode: "readonly" },
       "/home/user/.tuor",
     );
     expect(result.guestPath).toBe("/home/user");
@@ -40,7 +40,7 @@ describe("resolveWorkdir", () => {
     const mountConfig = {
       hostPath: "/host/project",
       guestPath: "/workspace",
-      readOnly: true,
+      mode: "readonly",
     } as const;
     const result = resolveWorkdir(mountConfig, "/any/configDir");
     expect(result.mount).toBe(mountConfig);
