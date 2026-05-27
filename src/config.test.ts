@@ -63,6 +63,34 @@ describe("parseConfig", () => {
     expect(parseConfig({ workdir: "/workspace" }).workdir).toBe("/workspace");
   });
 
+  test("accepts workdir as tilde path string", () => {
+    expect(parseConfig({ workdir: "~/workspace" }).workdir).toBe("~/workspace");
+  });
+
+  test("accepts tilde guestPath in mount", () => {
+    const config = parseConfig({
+      mounts: [{ hostPath: "/data", guestPath: "~/data" }],
+    });
+    expect(config.mounts![0]!.guestPath).toBe("~/data");
+  });
+
+  test("accepts tilde hostPath in mount", () => {
+    const config = parseConfig({
+      mounts: [{ hostPath: "~/projects" }],
+    });
+    expect(config.mounts![0]!.hostPath).toBe("~/projects");
+  });
+
+  test("accepts guestHomeDir override", () => {
+    const config = parseConfig({ guestHomeDir: "/custom/home" });
+    expect(config.guestHomeDir).toBe("/custom/home");
+  });
+
+  test("omits guestHomeDir when not specified", () => {
+    const config = parseConfig({});
+    expect(config.guestHomeDir).toBeUndefined();
+  });
+
   test("parses mount with ignore list", () => {
     const config = parseConfig({
       mounts: [{ hostPath: "/data", ignore: [".env", ".git"] }],

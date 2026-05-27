@@ -5,9 +5,12 @@ import { scope, type } from "arktype";
 // --- Schema (single source of truth for validation + types) ---
 
 const AbsolutePath = type("string > 0").matching(/^\//);
+/** Path starting with ~ (bare "~" or "~/…"), expanded at resolution time. */
+const TildePath = type("string > 0").matching(/^~(\/|$)/);
 
 const types = scope({
   AbsolutePath,
+  TildePath,
   /**
    * - readwrite: full read/write access to the host directory
    * - readonly: host directory is mounted read-only
@@ -21,7 +24,7 @@ const types = scope({
     /** Absolute path or path relative to directory containing config file */
     hostPath: "string > 0",
     /** If guestPath is not given explicitly, it will be the same path as on the host. */
-    "guestPath?": "AbsolutePath",
+    "guestPath?": "AbsolutePath | TildePath",
     "mode": "MountMode = 'readonly'",
     /**
      * Patterns to hide from the guest. Bare names (e.g. ".env") match at any
@@ -60,7 +63,7 @@ const types = scope({
    * into, or a full mount config (which also sets up the host→guest mount and
    * then cd's into the guest path).
    */
-  WorkdirConfig: "AbsolutePath | MountConfig",
+  WorkdirConfig: "AbsolutePath | TildePath | MountConfig",
   TuorConfig: {
     /**
      * When `nix` is given (even if "empty", i.e. just {}), Nix support will be
@@ -71,6 +74,11 @@ const types = scope({
     "user": "string > 0 = 'root'",
     "mounts?": "MountConfig[]",
     "workdir": "WorkdirConfig = '/'",
+    /**
+     * Override the assumed guest user home directory (used for ~ expansion
+     * in guestPaths). Defaults to /root for root, /home/$user otherwise.
+     */
+    "guestHomeDir?": "AbsolutePath",
     /**
      * Minimum virtual disk size for the rootfs (e.g. "2G", "512M").
      * The COW overlay will be grown to at least this size before boot.

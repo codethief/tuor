@@ -25,11 +25,17 @@ const noopIgnoreFileDeps: IgnoreFileDeps = {
   walkFiles: () => [],
 };
 
+// Shorthand: most tests don't care about tilde expansion so we pass dummy home dirs
+const HOST_HOME = "/home/hostuser";
+const GUEST_HOME = "/home/guestuser";
+
 describe("resolveMounts", () => {
   test("resolves relative hostPath against configDir", () => {
     const result = resolveMounts(
       [{ hostPath: "..", mode: "readwrite" }],
       "/home/user/.tuor",
+      HOST_HOME,
+      GUEST_HOME,
     );
     expect(result).toMatchObject([
       { hostPath: "/home/user", guestPath: "/home/user", mode: "readwrite" },
@@ -40,6 +46,8 @@ describe("resolveMounts", () => {
     const result = resolveMounts(
       [{ hostPath: "/opt/data", mode: "readwrite" }],
       "/home/user/.tuor",
+      HOST_HOME,
+      GUEST_HOME,
     );
     expect(result).toMatchObject([
       { hostPath: "/opt/data", guestPath: "/opt/data", mode: "readwrite" },
@@ -50,6 +58,8 @@ describe("resolveMounts", () => {
     const result = resolveMounts(
       [{ hostPath: "../project", mode: "readonly" }],
       "/home/user/.tuor",
+      HOST_HOME,
+      GUEST_HOME,
     );
     expect(result[0]!.guestPath).toBe("/home/user/project");
   });
@@ -58,6 +68,8 @@ describe("resolveMounts", () => {
     const result = resolveMounts(
       [{ hostPath: "/opt/data", guestPath: "/workspace", mode: "readonly" }],
       "/anywhere",
+      HOST_HOME,
+      GUEST_HOME,
     );
     expect(result[0]!.guestPath).toBe("/workspace");
   });
@@ -66,18 +78,22 @@ describe("resolveMounts", () => {
     const result = resolveMounts(
       [{ hostPath: "/opt/data", mode: "overlay" }],
       "/anywhere",
+      HOST_HOME,
+      GUEST_HOME,
     );
     expect(result[0]!.mode).toBe("overlay");
   });
 
   test("returns empty array for empty input", () => {
-    expect(resolveMounts([], "/anywhere")).toEqual([]);
+    expect(resolveMounts([], "/anywhere", HOST_HOME, GUEST_HOME)).toEqual([]);
   });
 
   test("preserves ignore list when present", () => {
     const result = resolveMounts(
       [{ hostPath: "/opt/data", mode: "readonly", ignore: [".env", ".git"] }],
       "/anywhere",
+      HOST_HOME,
+      GUEST_HOME,
     );
     expect(result[0]!.ignore).toEqual([".env", ".git"]);
   });
@@ -86,6 +102,8 @@ describe("resolveMounts", () => {
     const result = resolveMounts(
       [{ hostPath: "/opt/data", mode: "readonly" }],
       "/anywhere",
+      HOST_HOME,
+      GUEST_HOME,
     );
     expect(result[0]).not.toHaveProperty("ignore");
   });
@@ -94,6 +112,8 @@ describe("resolveMounts", () => {
     const result = resolveMounts(
       [{ hostPath: "/opt/data", mode: "readonly" }],
       "/anywhere",
+      HOST_HOME,
+      GUEST_HOME,
     );
     expect(result[0]!.ignoreFileRefs).toEqual([
       "host:./tuorignore",
@@ -105,8 +125,40 @@ describe("resolveMounts", () => {
     const result = resolveMounts(
       [{ hostPath: "/opt/data", mode: "readonly", ignoreFileRefs: ["host:custom"] }],
       "/anywhere",
+      HOST_HOME,
+      GUEST_HOME,
     );
     expect(result[0]!.ignoreFileRefs).toEqual(["host:custom"]);
+  });
+
+  test("expands ~ in hostPath using host home dir", () => {
+    const result = resolveMounts(
+      [{ hostPath: "~/projects", mode: "readonly" }],
+      "/anywhere",
+      "/home/alice",
+      GUEST_HOME,
+    );
+    expect(result[0]!.hostPath).toBe("/home/alice/projects");
+  });
+
+  test("expands ~ in guestPath using guest home dir", () => {
+    const result = resolveMounts(
+      [{ hostPath: "/opt/data", guestPath: "~/data", mode: "readonly" }],
+      "/anywhere",
+      HOST_HOME,
+      "/home/bob",
+    );
+    expect(result[0]!.guestPath).toBe("/home/bob/data");
+  });
+
+  test("expands bare ~ in guestPath to guest home dir", () => {
+    const result = resolveMounts(
+      [{ hostPath: "/opt/data", guestPath: "~", mode: "readonly" }],
+      "/anywhere",
+      HOST_HOME,
+      "/root",
+    );
+    expect(result[0]!.guestPath).toBe("/root");
   });
 });
 
@@ -269,6 +321,6 @@ describe("prepareMounts", () => {
       isDirectory: () => true,
       ignoreFile: noopIgnoreFileDeps,
     };
-    expect(prepareMounts([], "/anywhere", deps)).toEqual({});
+    expect(prepareMounts([], "/anywhere", HOST_HOME, GUEST_HOME, deps)).toEqual({});
   });
 });

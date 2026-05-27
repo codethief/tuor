@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { VM } from "@earendil-works/gondolin";
 import { findConfigDir, parseConfig } from "./config.ts";
+import { inferGuestHomeDir } from "./homedir.ts";
 import { prepareMounts } from "./mounts.ts";
 import { resolveNixSetup } from "./nix.ts";
 import { resolveWorkdir } from "./workdir.ts";
@@ -18,8 +20,11 @@ if (!configDir) {
 const raw = JSON.parse(readFileSync(join(configDir, "config.json"), "utf-8"));
 const config = parseConfig(raw);
 
+const hostHome = homedir();
+const guestHome = config.guestHomeDir ?? inferGuestHomeDir(config.user);
+
 const nixSetup = config.nix ? resolveNixSetup(config.nix) : undefined;
-const workdir = resolveWorkdir(config.workdir, configDir);
+const workdir = resolveWorkdir(config.workdir, configDir, hostHome, guestHome);
 
 const allMounts = [
   ...(nixSetup?.mounts ?? []),
@@ -27,7 +32,7 @@ const allMounts = [
   ...(workdir.mount ? [workdir.mount] : []),
 ];
 const vfsMounts =
-  allMounts.length > 0 ? prepareMounts(allMounts, configDir) : undefined;
+  allMounts.length > 0 ? prepareMounts(allMounts, configDir, hostHome, guestHome) : undefined;
 
 const vm = await VM.create({
   dns: { mode: "open" },

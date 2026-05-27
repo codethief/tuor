@@ -9,6 +9,7 @@ import {
 } from "@earendil-works/gondolin";
 import { OverlayProvider } from "./overlay-provider.ts";
 import type { MountConfig, MountMode } from "./config.ts";
+import { expandTilde } from "./homedir.ts";
 import {
   parseIgnoreFileRef,
   collectIgnorePatterns,
@@ -40,15 +41,26 @@ const DEFAULT_IGNORE_FILE_REFS = ["host:./tuorignore", "mount:.tuorignore"];
 function resolveMounts(
   mounts: MountConfig[],
   configDir: string,
+  hostHomeDir: string,
+  guestHomeDir: string,
 ): ResolvedMount[] {
   return mounts.map((m) => {
-    const hostPath = resolve(configDir, m.hostPath);
     // TODO I'm not sure I like that we're applying config defaults (guestPath,
     // ignoreFileRefs) here. Maybe they should rather be in the config layer
     // ("UI layer"), since they're purely about user convenience?
+    
+    // When guestPath is omitted, we use the expanded *host* path — even if
+    // hostPath contained a tilde. This is intentional: the whole point of
+    // omitting guestPath is to keep host and guest paths identical (e.g. so
+    // that paths in log messages match the host). Users who want ~ to expand
+    // to the *guest* user's home can provide an explicit guestPath like "~/…".
+    const hostPath = resolve(configDir, expandTilde(m.hostPath, hostHomeDir));
+    const guestPath = m.guestPath
+      ? expandTilde(m.guestPath, guestHomeDir)
+      : hostPath;
     return {
       hostPath,
-      guestPath: m.guestPath ?? hostPath,
+      guestPath,
       mode: m.mode,
       ...(m.ignore ? { ignore: m.ignore } : {}),
       ignoreFileRefs: m.ignoreFileRefs ?? DEFAULT_IGNORE_FILE_REFS,
@@ -145,9 +157,11 @@ const defaultMountDeps: MountDeps = {
 function prepareMounts(
   mounts: MountConfig[],
   configDir: string,
+  hostHomeDir: string,
+  guestHomeDir: string,
   deps: MountDeps = defaultMountDeps,
 ): Record<string, VirtualProvider> {
-  const resolved = resolveMounts(mounts, configDir);
+  const resolved = resolveMounts(mounts, configDir, hostHomeDir, guestHomeDir);
   validateMounts(resolved, deps);
   return buildVfsMounts(resolved, configDir, deps.ignoreFile);
 }
