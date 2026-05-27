@@ -33,11 +33,13 @@ describe("resolveNixSetup", () => {
   describe("mounts", () => {
     test("always mounts /nix read-only", () => {
       const { mounts } = resolveNixSetup({ nixLd: false }, deps());
-      expect(mounts).toContainEqual({
-        hostPath: "/nix",
-        guestPath: "/nix",
-        mode: "readonly",
-      });
+      expect(mounts).toContainEqual(
+        expect.objectContaining({
+          hostPath: "/nix",
+          guestPath: "/nix",
+          mode: "readonly",
+        }),
+      );
     });
 
     test("does not mount /lib64 by default", () => {
@@ -47,11 +49,13 @@ describe("resolveNixSetup", () => {
 
     test("mounts /lib64 read-only when nixLd is true", () => {
       const { mounts } = resolveNixSetup({ nixLd: true }, deps());
-      expect(mounts).toContainEqual({
-        hostPath: "/lib64",
-        guestPath: "/lib64",
-        mode: "readonly",
-      });
+      expect(mounts).toContainEqual(
+        expect.objectContaining({
+          hostPath: "/lib64",
+          guestPath: "/lib64",
+          mode: "readonly",
+        }),
+      );
     });
 
     test("throws when nixLd is true but /lib64 does not exist", () => {

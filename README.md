@@ -41,10 +41,45 @@ host-side mounts on top. Example config:
       "hostPath": "/path/on/the/host",
       "guestPath": "/path/on/the/guest",
       "readonly": true,
+      "ignore": [".env", "secrets"],  // Optional: explicit paths to hide from the guest
+      "ignoreFileRefs": ["host:./tuorignore", "mount:.tuorignore"]  // Optional, shown here with default value
     }
   ]
 }
 ```
+
+## Ignore files
+
+Tuor can hide host files from mounted directories using ignore files (one path
+per line, `#` for comments). Each mount has an `ignoreFileRefs` list that
+defaults to `["host:./tuorignore", "mount:.tuorignore"]`, meaning:
+
+- **`host:./tuorignore`** — a shared ignore file in the `.tuor/` config directory
+- **`mount:.tuorignore`** — per-directory `.tuorignore` files inside the mounted
+  host directory (recursive lookup, like `.gitignore`)
+
+The `host:` prefix resolves paths relative to the `.tuor/` config dir (or
+absolute). The `mount:` prefix resolves within the mounted host directory —
+relative paths trigger recursive lookup, absolute paths match a single file.
+
+Patterns from `ignoreFileRefs` are merged with any explicit `ignore` list on the
+mount. Missing ignore files are silently skipped.
+
+### Pattern matching rules
+
+- **Bare name** (no `/`): matches at any depth. E.g. `.envrc` hides `/.envrc`,
+  `/sub/.envrc`, `/a/b/.envrc`, etc.
+- **Path containing `/`**: anchored to the mount root. E.g. `sub/.envrc` only
+  hides `/sub/.envrc`.
+- A trailing `/` is stripped before matching (it does *not* restrict matching to
+  directories only). Exception: a bare `/` is not stripped.
+- A match on a path also hides everything below it (e.g. `.git` hides
+  `.git/config`).
+- Globs (`**/foo/bar*`) are not supported yet.
+
+### Caveats
+
+Ignore files are loaded once at boot. Changes require a VM restart.
 
 
 # Development

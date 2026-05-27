@@ -81,7 +81,7 @@ function resolveExplicitProfiles(
 
 function buildMounts(config: NixConfig, deps: NixDeps): ResolvedMount[] {
   const mounts: ResolvedMount[] = [
-    { hostPath: "/nix", guestPath: "/nix", mode: "readonly" },
+    { hostPath: "/nix", guestPath: "/nix", mode: "readonly", ignoreFileRefs: [] },
   ];
 
   if (config.nixLd) {
@@ -91,7 +91,7 @@ function buildMounts(config: NixConfig, deps: NixDeps): ResolvedMount[] {
           "Is nix-ld installed?",
       );
     }
-    mounts.push({ hostPath: "/lib64", guestPath: "/lib64", mode: "readonly" });
+    mounts.push({ hostPath: "/lib64", guestPath: "/lib64", mode: "readonly", ignoreFileRefs: [] });
   }
 
   return mounts;

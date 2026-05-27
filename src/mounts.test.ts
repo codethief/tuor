@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   resolveMounts,
@@ -13,8 +14,16 @@ import {
 import {
   RealFSProvider,
   ReadonlyProvider,
+  ShadowProvider,
 } from "@earendil-works/gondolin";
 import { OverlayProvider } from "./overlay-provider.ts";
+import type { IgnoreFileDeps } from "./ignore-file.ts";
+
+const noopIgnoreFileDeps: IgnoreFileDeps = {
+  readFile: () => "",
+  pathExists: () => false,
+  walkFiles: () => [],
+};
 
 describe("resolveMounts", () => {
   test("resolves relative hostPath against configDir", () => {
@@ -22,7 +31,7 @@ describe("resolveMounts", () => {
       [{ hostPath: "..", mode: "readwrite" }],
       "/home/user/.tuor",
     );
-    expect(result).toEqual([
+    expect(result).toMatchObject([
       { hostPath: "/home/user", guestPath: "/home/user", mode: "readwrite" },
     ]);
   });
@@ -32,7 +41,7 @@ describe("resolveMounts", () => {
       [{ hostPath: "/opt/data", mode: "readwrite" }],
       "/home/user/.tuor",
     );
-    expect(result).toEqual([
+    expect(result).toMatchObject([
       { hostPath: "/opt/data", guestPath: "/opt/data", mode: "readwrite" },
     ]);
   });
@@ -64,17 +73,53 @@ describe("resolveMounts", () => {
   test("returns empty array for empty input", () => {
     expect(resolveMounts([], "/anywhere")).toEqual([]);
   });
+
+  test("preserves ignore list when present", () => {
+    const result = resolveMounts(
+      [{ hostPath: "/opt/data", mode: "readonly", ignore: [".env", ".git"] }],
+      "/anywhere",
+    );
+    expect(result[0]!.ignore).toEqual([".env", ".git"]);
+  });
+
+  test("omits ignore when not present in config", () => {
+    const result = resolveMounts(
+      [{ hostPath: "/opt/data", mode: "readonly" }],
+      "/anywhere",
+    );
+    expect(result[0]).not.toHaveProperty("ignore");
+  });
+
+  test("defaults ignoreFileRefs when not provided", () => {
+    const result = resolveMounts(
+      [{ hostPath: "/opt/data", mode: "readonly" }],
+      "/anywhere",
+    );
+    expect(result[0]!.ignoreFileRefs).toEqual([
+      "host:./tuorignore",
+      "mount:.tuorignore",
+    ]);
+  });
+
+  test("uses explicit ignoreFileRefs when provided", () => {
+    const result = resolveMounts(
+      [{ hostPath: "/opt/data", mode: "readonly", ignoreFileRefs: ["host:custom"] }],
+      "/anywhere",
+    );
+    expect(result[0]!.ignoreFileRefs).toEqual(["host:custom"]);
+  });
 });
 
 describe("validateMounts", () => {
   const validDeps: MountDeps = {
     pathExists: () => true,
     isDirectory: () => true,
+    ignoreFile: noopIgnoreFileDeps,
   };
 
   test("passes for existing directories", () => {
     const mounts: ResolvedMount[] = [
-      { hostPath: "/opt/data", guestPath: "/data", mode: "readwrite" },
+      { hostPath: "/opt/data", guestPath: "/data", mode: "readwrite", ignoreFileRefs: [] },
     ];
     expect(() => validateMounts(mounts, validDeps)).not.toThrow();
   });
@@ -83,9 +128,10 @@ describe("validateMounts", () => {
     const deps: MountDeps = {
       pathExists: () => false,
       isDirectory: () => true,
+      ignoreFile: noopIgnoreFileDeps,
     };
     const mounts: ResolvedMount[] = [
-      { hostPath: "/nonexistent", guestPath: "/data", mode: "readwrite" },
+      { hostPath: "/nonexistent", guestPath: "/data", mode: "readwrite", ignoreFileRefs: [] },
     ];
     expect(() => validateMounts(mounts, deps)).toThrow(
       "Mount host path does not exist: /nonexistent",
@@ -96,9 +142,10 @@ describe("validateMounts", () => {
     const deps: MountDeps = {
       pathExists: () => true,
       isDirectory: () => false,
+      ignoreFile: noopIgnoreFileDeps,
     };
     const mounts: ResolvedMount[] = [
-      { hostPath: "/some/file.txt", guestPath: "/data", mode: "readwrite" },
+      { hostPath: "/some/file.txt", guestPath: "/data", mode: "readwrite", ignoreFileRefs: [] },
     ];
     expect(() => validateMounts(mounts, deps)).toThrow(
       "Mount host path is not a directory: /some/file.txt",
@@ -107,8 +154,8 @@ describe("validateMounts", () => {
 
   test("throws on duplicate guestPaths", () => {
     const mounts: ResolvedMount[] = [
-      { hostPath: "/a", guestPath: "/data", mode: "readwrite" },
-      { hostPath: "/b", guestPath: "/data", mode: "readwrite" },
+      { hostPath: "/a", guestPath: "/data", mode: "readwrite", ignoreFileRefs: [] },
+      { hostPath: "/b", guestPath: "/data", mode: "readwrite", ignoreFileRefs: [] },
     ];
     expect(() => validateMounts(mounts, validDeps)).toThrow(
       "Duplicate guest mount path: /data",
@@ -145,35 +192,68 @@ describe("getOverlayStateDir", () => {
 describe("buildVfsMounts", () => {
   test("readwrite mode creates RealFSProvider", () => {
     const mounts: ResolvedMount[] = [
-      { hostPath: "/tmp", guestPath: "/data", mode: "readwrite" },
+      { hostPath: "/tmp", guestPath: "/data", mode: "readwrite", ignoreFileRefs: [] },
     ];
-    const result = buildVfsMounts(mounts, "/cfg");
+    const result = buildVfsMounts(mounts, "/cfg", noopIgnoreFileDeps);
     expect(result["/data"]).toBeInstanceOf(RealFSProvider);
   });
 
   test("readonly mode creates ReadonlyProvider", () => {
     const mounts: ResolvedMount[] = [
-      { hostPath: "/tmp", guestPath: "/data", mode: "readonly" },
+      { hostPath: "/tmp", guestPath: "/data", mode: "readonly", ignoreFileRefs: [] },
     ];
-    const result = buildVfsMounts(mounts, "/cfg");
+    const result = buildVfsMounts(mounts, "/cfg", noopIgnoreFileDeps);
     expect(result["/data"]).toBeInstanceOf(ReadonlyProvider);
   });
 
   test("overlay-tmpfs mode creates OverlayProvider", () => {
     const mounts: ResolvedMount[] = [
-      { hostPath: "/tmp", guestPath: "/data", mode: "overlay-tmpfs" },
+      { hostPath: "/tmp", guestPath: "/data", mode: "overlay-tmpfs", ignoreFileRefs: [] },
     ];
-    const result = buildVfsMounts(mounts, "/cfg");
+    const result = buildVfsMounts(mounts, "/cfg", noopIgnoreFileDeps);
     expect(result["/data"]).toBeInstanceOf(OverlayProvider);
+  });
+
+  test("ignore wraps backend with ShadowProvider, hiding specified files", async () => {
+    const hostDir = mkdtempSync(`${tmpdir()}/tuor-test-`);
+    try {
+      writeFileSync(join(hostDir, "visible.txt"), "hello");
+      writeFileSync(join(hostDir, ".env"), "SECRET=123");
+      const mounts: ResolvedMount[] = [
+        { hostPath: hostDir, guestPath: "/data", mode: "readonly", ignore: [".env"], ignoreFileRefs: [] },
+      ];
+      const result = buildVfsMounts(mounts, "/cfg", noopIgnoreFileDeps);
+      const provider = result["/data"]!;
+
+      await expect(provider.stat("/visible.txt")).resolves.toBeDefined();
+      await expect(provider.stat("/.env")).rejects.toThrow(/ENOENT|ERRNO_2/);
+
+      const entries = await provider.readdir("/");
+      const names = entries.map((e: string | { name: string }) =>
+        typeof e === "string" ? e : e.name,
+      );
+      expect(names).toContain("visible.txt");
+      expect(names).not.toContain(".env");
+    } finally {
+      rmSync(hostDir, { recursive: true });
+    }
+  });
+
+  test("no ignore does not wrap with ShadowProvider", () => {
+    const mounts: ResolvedMount[] = [
+      { hostPath: "/tmp", guestPath: "/data", mode: "readwrite", ignoreFileRefs: [] },
+    ];
+    const result = buildVfsMounts(mounts, "/cfg", noopIgnoreFileDeps);
+    expect(result["/data"]).toBeInstanceOf(RealFSProvider);
   });
 
   test("overlay mode creates OverlayProvider and state directory", () => {
     const configDir = mkdtempSync(`${tmpdir()}/tuor-test-`);
     try {
       const mounts: ResolvedMount[] = [
-        { hostPath: "/tmp", guestPath: "/workspace", mode: "overlay" },
+        { hostPath: "/tmp", guestPath: "/workspace", mode: "overlay", ignoreFileRefs: [] },
       ];
-      const result = buildVfsMounts(mounts, configDir);
+      const result = buildVfsMounts(mounts, configDir, noopIgnoreFileDeps);
       expect(result["/workspace"]).toBeInstanceOf(OverlayProvider);
       expect(existsSync(`${configDir}/.state/overlays/workspace`)).toBe(true);
     } finally {
@@ -187,6 +267,7 @@ describe("prepareMounts", () => {
     const deps: MountDeps = {
       pathExists: () => true,
       isDirectory: () => true,
+      ignoreFile: noopIgnoreFileDeps,
     };
     expect(prepareMounts([], "/anywhere", deps)).toEqual({});
   });

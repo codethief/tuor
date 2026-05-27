@@ -4,10 +4,18 @@ import {
   RealFSProvider,
   ReadonlyProvider,
   MemoryProvider,
+  ShadowProvider,
   type VirtualProvider,
 } from "@earendil-works/gondolin";
 import { OverlayProvider } from "./overlay-provider.ts";
 import type { MountConfig, MountMode } from "./config.ts";
+import {
+  parseIgnoreFileRef,
+  collectIgnorePatterns,
+  buildShadowPredicate,
+  defaultIgnoreFileDeps,
+  type IgnoreFileDeps,
+} from "./ignore-file.ts";
 
 // --- Types ---
 
@@ -15,14 +23,19 @@ type ResolvedMount = {
   hostPath: string;
   guestPath: string;
   mode: MountMode;
+  ignore?: string[];
+  ignoreFileRefs: string[];
 };
 
 type MountDeps = {
   pathExists: (p: string) => boolean;
   isDirectory: (p: string) => boolean;
+  ignoreFile: IgnoreFileDeps;
 };
 
 // --- Functional core ---
+
+const DEFAULT_IGNORE_FILE_REFS = ["host:./tuorignore", "mount:.tuorignore"];
 
 function resolveMounts(
   mounts: MountConfig[],
@@ -34,6 +47,8 @@ function resolveMounts(
       hostPath,
       guestPath: m.guestPath ?? hostPath,
       mode: m.mode,
+      ...(m.ignore ? { ignore: m.ignore } : {}),
+      ignoreFileRefs: m.ignoreFileRefs ?? DEFAULT_IGNORE_FILE_REFS,
     };
   });
 }
@@ -78,10 +93,20 @@ function getOverlayStateDir(configDir: string, guestPath: string): string {
 function buildVfsMounts(
   mounts: ResolvedMount[],
   configDir: string,
+  ignoreFileDeps: IgnoreFileDeps = defaultIgnoreFileDeps,
 ): Record<string, VirtualProvider> {
   const result: Record<string, VirtualProvider> = {};
   for (const mount of mounts) {
-    const backend = new RealFSProvider(mount.hostPath);
+    let backend: VirtualProvider = new RealFSProvider(mount.hostPath);
+
+    const refs = mount.ignoreFileRefs.map(parseIgnoreFileRef);
+    const filePatterns = collectIgnorePatterns(refs, mount.hostPath, configDir, ignoreFileDeps);
+    const allPatterns = [...(mount.ignore ?? []).map((pattern) => ({ pattern, scope: "/" })), ...filePatterns];
+
+    if (allPatterns.length > 0) {
+      const predicate = buildShadowPredicate(allPatterns);
+      backend = new ShadowProvider(backend, { shouldShadow: predicate, writeMode: "deny" });
+    }
     switch (mount.mode) {
       case "readwrite":
         result[mount.guestPath] = backend;
@@ -111,6 +136,7 @@ function buildVfsMounts(
 const defaultMountDeps: MountDeps = {
   pathExists: existsSync,
   isDirectory: (p) => statSync(p).isDirectory(),
+  ignoreFile: defaultIgnoreFileDeps,
 };
 
 function prepareMounts(
@@ -120,7 +146,7 @@ function prepareMounts(
 ): Record<string, VirtualProvider> {
   const resolved = resolveMounts(mounts, configDir);
   validateMounts(resolved, deps);
-  return buildVfsMounts(resolved, configDir);
+  return buildVfsMounts(resolved, configDir, deps.ignoreFile);
 }
 
 export { resolveMounts, validateMounts, buildVfsMounts, getOverlayStateDir, prepareMounts };

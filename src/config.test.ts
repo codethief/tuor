@@ -33,7 +33,7 @@ describe("parseConfig", () => {
       },
     };
     const config = parseConfig(raw);
-    expect(config).toEqual({
+    expect(config).toMatchObject({
       user: "dev",
       workdir: {
         hostPath: "/host/project",
@@ -63,6 +63,34 @@ describe("parseConfig", () => {
     expect(parseConfig({ workdir: "/workspace" }).workdir).toBe("/workspace");
   });
 
+  test("parses mount with ignore list", () => {
+    const config = parseConfig({
+      mounts: [{ hostPath: "/data", ignore: [".env", ".git"] }],
+    });
+    expect(config.mounts![0]!.ignore).toEqual([".env", ".git"]);
+  });
+
+  test("omits ignore when not specified", () => {
+    const config = parseConfig({
+      mounts: [{ hostPath: "/data" }],
+    });
+    expect(config.mounts![0]).not.toHaveProperty("ignore");
+  });
+
+  test("accepts explicit ignoreFileRefs", () => {
+    const config = parseConfig({
+      mounts: [{ hostPath: "/data", ignoreFileRefs: ["host:custom", "mount:.myignore"] }],
+    });
+    expect(config.mounts![0]!.ignoreFileRefs).toEqual(["host:custom", "mount:.myignore"]);
+  });
+
+  test("omits ignoreFileRefs when not specified", () => {
+    const config = parseConfig({
+      mounts: [{ hostPath: "/data" }],
+    });
+    expect(config.mounts![0]).not.toHaveProperty("ignoreFileRefs");
+  });
+
   test.each([
     ["relative guestPath", { mounts: [{ hostPath: "/foo", guestPath: "rel" }] }],
     ["empty hostPath", { mounts: [{ hostPath: "" }] }],
@@ -72,6 +100,7 @@ describe("parseConfig", () => {
     ["empty workdir string", { workdir: "" }],
     ["relative nix profile", { nix: { profiles: ["relative/path"] } }],
     ["non-object input", "not an object"],
+    ["empty ignore array", { mounts: [{ hostPath: "/x", ignore: [] }] }],
   ])("rejects %s", (_label, raw) => {
     expect(() => parseConfig(raw)).toThrow();
   });

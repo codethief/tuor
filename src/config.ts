@@ -23,6 +23,24 @@ const types = scope({
     /** If guestPath is not given explicitly, it will be the same path as on the host. */
     "guestPath?": "AbsolutePath",
     "mode": "MountMode = 'readonly'",
+    /**
+     * Patterns to hide from the guest. Bare names (e.g. ".env") match at any
+     * depth; paths containing "/" are anchored to the mount root. A trailing
+     * "/" is stripped (exception: bare "/"). Write operations to hidden files
+     * will fail, unless `mode` is one of the overlay modes.
+     */
+    "ignore?": "string[] > 0",
+    /**
+     * References to ignore files (one path per line, # comments).
+     * Each entry is prefixed with a source:
+     * - "host:<path>" — resolved relative to .tuor/ config dir (or absolute)
+     * - "mount:<path>" — resolved within the mounted host directory;
+     *   relative paths (e.g. "mount:.tuorignore") trigger recursive lookup,
+     *   absolute paths (e.g. "mount:/.tuorignore") match a single file.
+     *
+     * Loaded once at boot; changes require VM restart.
+     */
+    "ignoreFileRefs?": "(string > 0)[]",
   },
   /**
    * When Nix support is enabled (by providing a NixConfig via `config.nix`),
