@@ -31,6 +31,7 @@ const vfsMounts =
 
 const vm = await VM.create({
   dns: { mode: "open" },
+  ...(config.rootfsSize ? { rootfs: { size: config.rootfsSize } } : {}),
   ...(nixSetup ? { env: nixSetup.env } : {}),
   ...(vfsMounts ? { vfs: { mounts: vfsMounts } } : {}),
 });

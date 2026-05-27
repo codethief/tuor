@@ -53,6 +53,12 @@ const types = scope({
     "user": "string > 0 = 'root'",
     "mounts?": "MountConfig[]",
     "workdir": "WorkdirConfig = '/'",
+    /**
+     * Minimum virtual disk size for the rootfs (e.g. "2G", "512M").
+     * The COW overlay will be grown to at least this size before boot.
+     * Actual host disk usage remains sparse (only written pages cost space).
+     */
+    "rootfsSize?": "string > 0",
   },
 }).export();
 

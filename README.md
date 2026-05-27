@@ -35,6 +35,7 @@ host-side mounts on top. Example config:
       "hostPath": "..",  // relative to config.json
       "guestPath": "/workspace"  // Can be omitted, in which case guestPath will be set to the resolved (absolute) hostPath
   },
+  "rootfsSize": "2G",  // Optional: minimum virtual disk size (COW overlay, so actual host usage stays sparse). When increased, the VM's file system will be expanded during VM boot-up.
   "mounts": [
     {
       "hostPath": "/path/on/the/host",
