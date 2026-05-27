@@ -43,6 +43,9 @@ function resolveMounts(
 ): ResolvedMount[] {
   return mounts.map((m) => {
     const hostPath = resolve(configDir, m.hostPath);
+    // TODO I'm not sure I like that we're applying config defaults (guestPath,
+    // ignoreFileRefs) here. Maybe they should rather be in the config layer
+    // ("UI layer"), since they're purely about user convenience?
     return {
       hostPath,
       guestPath: m.guestPath ?? hostPath,
