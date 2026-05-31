@@ -19,6 +19,7 @@ const types = scope({
    */
   MountMode: "'readwrite' | 'readonly' | 'overlay' | 'overlay-tmpfs'",
   MountConfig: {
+    "+": "reject",
     /** Absolute path or path relative to directory containing config file */
     hostPath: "string > 0",
     /** If guestPath is not given explicitly, it will be the same path as on the host. */
@@ -48,6 +49,7 @@ const types = scope({
    * the host's /nix will be mounted read-only into the guest.
    */
   NixConfig: {
+    "+": "reject",
     /**
      * Nix profile paths whose bin/ dirs go on PATH (must resolve to /nix/ via
      * symlinks). Auto-detected from $NIX_PROFILES if omitted.
@@ -86,9 +88,10 @@ const types = scope({
   WorkdirConfig: "AbsolutePath | TildePath | MountConfig",
   /** Network mode: unrestricted access or restricted to an allowlist. */
   NetworkConfig: [
-    { mode: "'open'" },
+    { "+": "reject", mode: "'open'" },
     "|",
     {
+      "+": "reject",
       mode: "'restricted'",
       /**
        * Host patterns allowed for HTTPS egress (wildcard supported, e.g.
@@ -105,6 +108,7 @@ const types = scope({
     },
   ],
   TuorConfig: {
+    "+": "reject",
     /**
      * When `nix` is given (even if "empty", i.e. just {}), Nix support will be
      * enabled.
