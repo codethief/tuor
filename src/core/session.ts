@@ -26,7 +26,10 @@ export type SessionSpec = {
 
 // --- Public API ---
 
-export async function runSession(spec: SessionSpec): Promise<void> {
+export async function runSession(
+  spec: SessionSpec,
+  command?: string[],
+): Promise<void> {
   const mountProviders =
     spec.mounts.length > 0 ? buildVfsMounts(spec.mounts) : {};
   const volumeProviders =
@@ -53,9 +56,12 @@ export async function runSession(spec: SessionSpec): Promise<void> {
   // `su myuser` gives us an interactive non-login shell (`su - myuser` would
   // give us a login shell but would also cd into the user's home dir, messing
   // with the cwd we configure below.)
+  const shellCommand = command
+    ? ["su", spec.user, "-c", command.join(" ")]
+    : ["su", spec.user];
   await vm.shell({
     attach: true,
-    command: ["su", spec.user],
+    command: shellCommand,
     cwd: spec.workdir,
   });
   await vm.close();

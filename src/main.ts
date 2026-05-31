@@ -17,4 +17,8 @@ if (!configDir) {
 const raw = JSON.parse(readFileSync(join(configDir, "config.json"), "utf-8"));
 const config = parseConfig(raw);
 const spec = resolveConfig(config, configDir, homedir());
-await runSession(spec);
+
+const dashDash = process.argv.indexOf("--");
+const command = dashDash >= 0 ? process.argv.slice(dashDash + 1) : undefined;
+
+await runSession(spec, command);
