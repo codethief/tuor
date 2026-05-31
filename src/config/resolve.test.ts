@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { resolveConfig, _getOverlayStateDir, type ResolveDeps } from "./resolve.ts";
+import { resolveConfig, _getOverlayStateDir, _resolveEnv, type ResolveDeps } from "./resolve.ts";
 import type { TuorConfig } from "./schema.ts";
 import type { IgnoreFileDeps } from "./ignore-files.ts";
 import type { NixDeps } from "./nix.ts";
@@ -16,6 +16,8 @@ const validDeps: ResolveDeps = {
     isDirectory: () => true,
   },
   ignoreFile: noopIgnoreFileDeps,
+  hostEnv: {},
+  warn: () => {},
 };
 
 const HOST_HOME = "/home/hostuser";
@@ -291,6 +293,124 @@ describe("resolveConfig", () => {
       });
       expect(spec.mounts[0]!.guestPath).toBe("/custom/home/data");
     });
+  });
+});
+
+describe("_resolveEnv", () => {
+  test("passes through string values", () => {
+    const result = _resolveEnv({ FOO: "bar" }, {}, () => {});
+    expect(result).toEqual({ FOO: "bar" });
+  });
+
+  test("reads host var with fromHost: true using same key", () => {
+    const result = _resolveEnv(
+      { EDITOR: { fromHost: true } },
+      { EDITOR: "vim" },
+      () => {},
+    );
+    expect(result).toEqual({ EDITOR: "vim" });
+  });
+
+  test("reads host var with fromHost: string using different key", () => {
+    const result = _resolveEnv(
+      { DB_URL: { fromHost: "DATABASE_URL" } },
+      { DATABASE_URL: "postgres://..." },
+      () => {},
+    );
+    expect(result).toEqual({ DB_URL: "postgres://..." });
+  });
+
+  test("warns and skips when host var is missing", () => {
+    const warnings: string[] = [];
+    const result = _resolveEnv(
+      { SECRET: { fromHost: true } },
+      {},
+      (msg) => warnings.push(msg),
+    );
+    expect(result).toEqual({});
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("SECRET");
+  });
+
+  test("warns and skips when renamed host var is missing", () => {
+    const warnings: string[] = [];
+    const result = _resolveEnv(
+      { MY_VAR: { fromHost: "NONEXISTENT" } },
+      {},
+      (msg) => warnings.push(msg),
+    );
+    expect(result).toEqual({});
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("NONEXISTENT");
+  });
+
+  test("resolves mixed value types", () => {
+    const result = _resolveEnv(
+      { FIXED: "val", FROM_HOST: { fromHost: true }, RENAMED: { fromHost: "SRC" } },
+      { FROM_HOST: "hostval", SRC: "srcval" },
+      () => {},
+    );
+    expect(result).toEqual({ FIXED: "val", FROM_HOST: "hostval", RENAMED: "srcval" });
+  });
+});
+
+describe("resolveConfig env integration", () => {
+  test("omits env when not configured and no nix", () => {
+    const spec = resolve({});
+    expect(spec.env).toBeUndefined();
+  });
+
+  test("passes through user env to SessionSpec", () => {
+    const spec = resolve(
+      { env: { MY_VAR: "hello" } },
+      "/cfg",
+      { ...validDeps, hostEnv: {} },
+    );
+    expect(spec.env).toEqual({ MY_VAR: "hello" });
+  });
+
+  test("user env overrides nix env", () => {
+    const nixDeps: NixDeps = {
+      hostEnv: {},
+      resolveProfiles: () => ["/nix/store/abc"],
+      realpath: (p) => p,
+      nixExists: () => true,
+      lib64Exists: () => true,
+      warn: () => {},
+    };
+    const spec = resolve(
+      { nix: { nixLd: false }, env: { PATH: "/custom/bin" } },
+      "/cfg",
+      { ...validDeps, nix: nixDeps },
+    );
+    expect(spec.env!.PATH).toBe("/custom/bin");
+  });
+
+  test("nix env preserved when user env does not overlap", () => {
+    const nixDeps: NixDeps = {
+      hostEnv: {},
+      resolveProfiles: () => ["/nix/store/abc"],
+      realpath: (p) => p,
+      nixExists: () => true,
+      lib64Exists: () => true,
+      warn: () => {},
+    };
+    const spec = resolve(
+      { nix: { nixLd: false }, env: { MY_VAR: "hello" } },
+      "/cfg",
+      { ...validDeps, nix: nixDeps },
+    );
+    expect(spec.env!.PATH).toContain("/nix/store/abc/bin");
+    expect(spec.env!.MY_VAR).toBe("hello");
+  });
+
+  test("resolves fromHost vars using deps.hostEnv", () => {
+    const spec = resolve(
+      { env: { EDITOR: { fromHost: true } } },
+      "/cfg",
+      { ...validDeps, hostEnv: { EDITOR: "vim" } },
+    );
+    expect(spec.env).toEqual({ EDITOR: "vim" });
   });
 });
 

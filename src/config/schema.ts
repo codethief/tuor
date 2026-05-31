@@ -57,6 +57,16 @@ const types = scope({
     "nixLd": "boolean = false",
   },
   /**
+   * Env var sourced from the host environment.
+   * - `{ fromHost: true }` reads the var with the same name from the host env
+   * - `{ fromHost: "OTHER_NAME" }` reads OTHER_NAME from the host env
+   */
+  EnvValueFromHost: {
+    "fromHost": "string > 0 | true",
+  },
+  /** An env var value: either a literal string or a source descriptor. */
+  EnvValue: "string | EnvValueFromHost",
+  /**
    * Working directory inside the guest. Either just a guest path (string) to cd
    * into, or a full mount config (which also sets up the host→guest mount and
    * then cd's into the guest path).
@@ -70,6 +80,8 @@ const types = scope({
     "nix?": "NixConfig",
     /** The user to open the shell under and to make mounted directories available for. */
     "user": "string > 0 = 'root'",
+    /** Environment variables to set in the guest. */
+    "env?": { "[string]": "EnvValue" },
     "mounts?": "MountConfig[]",
     "workdir": "WorkdirConfig = '/'",
     /**
@@ -88,6 +100,8 @@ const types = scope({
 
 export type MountConfig = typeof types.MountConfig.infer;
 export type NixConfig = typeof types.NixConfig.infer;
+export type EnvValueFromHost = typeof types.EnvValueFromHost.infer;
+export type EnvValue = typeof types.EnvValue.infer;
 export type WorkdirConfig = typeof types.WorkdirConfig.infer;
 export type TuorConfig = typeof types.TuorConfig.infer;
 

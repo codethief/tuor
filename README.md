@@ -36,6 +36,11 @@ host-side mounts on top. Example config:
       "guestPath": "/workspace"  // Can be omitted, in which case guestPath will be set to the resolved (absolute) hostPath
   },
   "rootfsSize": "2G",  // Optional: minimum virtual disk size (COW overlay, so actual host usage stays sparse). When increased, the VM's file system will be expanded during VM boot-up.
+  "env": {  // Optional: environment variables to set in the guest
+    "MY_VAR": "fixed_value",  // Literal value
+    "EDITOR": { "fromHost": true },  // Read from host env (same var name)
+    "DB_URL": { "fromHost": "DATABASE_URL" }  // Read from host env (different var name)
+  },
   "mounts": [
     {
       "hostPath": "/path/on/the/host",

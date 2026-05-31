@@ -4,7 +4,7 @@ import type { SessionSpec } from "../core/session.ts";
 import type { MountSpec, MountValidationDeps } from "../core/mounts.ts";
 import { validateMounts } from "../core/mounts.ts";
 import type { ScopedPattern } from "../core/shadow.ts";
-import type { MountConfig, TuorConfig, WorkdirConfig } from "./schema.ts";
+import type { EnvValue, MountConfig, TuorConfig, WorkdirConfig } from "./schema.ts";
 import { expandTilde, inferGuestHomeDir } from "./homedir.ts";
 import {
   parseIgnoreFileRef,
@@ -20,6 +20,8 @@ export type ResolveDeps = {
   mountValidation: MountValidationDeps;
   ignoreFile: IgnoreFileDeps;
   nix?: NixDeps;
+  hostEnv: Record<string, string | undefined>;
+  warn: (message: string) => void;
 };
 
 // --- Public API ---
@@ -60,15 +62,21 @@ export function resolveConfig(
 
   validateMounts(allMounts, deps.mountValidation);
 
+  // Resolve env: user env wins over nix env
+  const nixEnv = nixSetup?.env ?? {};
+  const userEnv = config.env
+    ? _resolveEnv(config.env, deps.hostEnv, deps.warn)
+    : {};
+  const mergedEnv = { ...nixEnv, ...userEnv };
+  const hasEnv = Object.keys(mergedEnv).length > 0;
+
   return {
     user: config.user,
     workdir: guestWorkdir,
     mounts: allMounts,
     ...(config.rootfsSize ? { rootfsSize: config.rootfsSize } : {}),
-    ...(nixSetup ? {
-      env: nixSetup.env,
-      bootCommands: [nixSetup.tlsSetupCommand],
-    } : {}),
+    ...(hasEnv ? { env: mergedEnv } : {}),
+    ...(nixSetup ? { bootCommands: [nixSetup.tlsSetupCommand] } : {}),
   };
 }
 
@@ -114,6 +122,28 @@ function resolveMountConfig(
   };
 }
 
+export function _resolveEnv(
+  env: Record<string, EnvValue>,
+  hostEnv: Record<string, string | undefined>,
+  warn: (message: string) => void,
+): Record<string, string> {
+  const resolved: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (typeof value === "string") {
+      resolved[key] = value;
+    } else {
+      const hostKey = value.fromHost === true ? key : value.fromHost;
+      const hostValue = hostEnv[hostKey];
+      if (hostValue === undefined) {
+        warn(`env var "${key}": host variable "${hostKey}" is not set, skipping`);
+      } else {
+        resolved[key] = hostValue;
+      }
+    }
+  }
+  return resolved;
+}
+
 function resolveWorkdir(
   workdir: WorkdirConfig,
   configDir: string,
@@ -150,6 +180,8 @@ const defaultResolveDeps: ResolveDeps = {
     isDirectory: (p) => statSync(p).isDirectory(),
   },
   ignoreFile: defaultIgnoreFileDeps,
+  hostEnv: process.env,
+  warn: (message) => console.warn(`[env] ${message}`),
 };
 
 
