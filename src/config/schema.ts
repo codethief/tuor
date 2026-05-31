@@ -3,8 +3,6 @@ import { dirname, join, resolve } from "node:path";
 import { scope, type } from "arktype";
 import type { MountMode as CoreMountMode } from "../core/mounts.ts";
 
-// --- Schema (single source of truth for validation + types) ---
-
 const AbsolutePath = type("string > 0").matching(/^\//);
 /** Path starting with ~ (bare "~" or "~/…"), expanded at resolution time. */
 const TildePath = type("string > 0").matching(/^~(\/|$)/);
@@ -103,8 +101,6 @@ export type NixConfig = typeof types.NixConfig.infer;
 export type WorkdirConfig = typeof types.WorkdirConfig.infer;
 export type TuorConfig = typeof types.TuorConfig.infer;
 
-// --- Config discovery ---
-
 export function findConfigDir(
   startDir: string,
   exists: (path: string) => boolean = existsSync,
@@ -121,8 +117,6 @@ export function findConfigDir(
     dir = parent;
   }
 }
-
-// --- Config parsing ---
 
 export function parseConfig(raw: unknown): TuorConfig {
   const result = types.TuorConfig(raw);

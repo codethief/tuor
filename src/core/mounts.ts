@@ -28,8 +28,6 @@ export type MountValidationDeps = {
   isDirectory: (p: string) => boolean;
 };
 
-// --- Validation ---
-
 export function validateMounts(
   mounts: MountSpec[],
   deps: MountValidationDeps,
@@ -56,8 +54,6 @@ export function validateMounts(
     seen.add(mount.guestPath);
   }
 }
-
-// --- VFS construction ---
 
 export function buildVfsMounts(
   mounts: MountSpec[],

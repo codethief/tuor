@@ -16,8 +16,6 @@ export type IgnoreFileDeps = {
 };
 
 
-// --- Parsing ---
-
 export function parseIgnoreFileRef(ref: string): IgnoreFileRef {
   const colonIdx = ref.indexOf(":");
   if (colonIdx === -1) {

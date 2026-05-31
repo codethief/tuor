@@ -121,7 +121,7 @@ function buildEnv(
   return env;
 }
 
-// --- Default deps (imperative shell) ---
+// --- Default deps ---
 
 /**
  * Resolve Nix profiles from $NIX_PROFILES. Each entry is resolved to its real
