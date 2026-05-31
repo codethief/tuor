@@ -11,10 +11,10 @@ import { buildShadowPredicate, type ScopedPattern } from "./shadow.ts";
 
 // --- Types ---
 
-type MountMode = "readwrite" | "readonly" | "overlay" | "overlay-tmpfs";
+export type MountMode = "readwrite" | "readonly" | "overlay" | "overlay-tmpfs";
 
 /** Core's input contract for a single mount — fully resolved, no optionals. */
-type MountSpec = {
+export type MountSpec = {
   hostPath: string;
   guestPath: string;
   mode: MountMode;
@@ -23,14 +23,14 @@ type MountSpec = {
   overlayStateDir?: string;
 };
 
-type MountValidationDeps = {
+export type MountValidationDeps = {
   pathExists: (p: string) => boolean;
   isDirectory: (p: string) => boolean;
 };
 
 // --- Validation ---
 
-function validateMounts(
+export function validateMounts(
   mounts: MountSpec[],
   deps: MountValidationDeps,
 ): void {
@@ -59,7 +59,7 @@ function validateMounts(
 
 // --- VFS construction ---
 
-function buildVfsMounts(
+export function buildVfsMounts(
   mounts: MountSpec[],
 ): Record<string, VirtualProvider> {
   const result: Record<string, VirtualProvider> = {};
@@ -100,5 +100,4 @@ function buildVfsMounts(
   return result;
 }
 
-export { validateMounts, buildVfsMounts };
-export type { MountMode, MountSpec, MountValidationDeps };
+

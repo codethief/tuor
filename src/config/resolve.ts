@@ -16,7 +16,7 @@ import { resolveNixSetup, type NixDeps } from "./nix.ts";
 
 // --- Types ---
 
-type ResolveDeps = {
+export type ResolveDeps = {
   mountValidation: MountValidationDeps;
   ignoreFile: IgnoreFileDeps;
   nix?: NixDeps;
@@ -24,7 +24,7 @@ type ResolveDeps = {
 
 // --- Public API ---
 
-function resolveConfig(
+export function resolveConfig(
   config: TuorConfig,
   configDir: string,
   hostHomeDir: string,
@@ -136,7 +136,7 @@ function resolveWorkdir(
 }
 
 /** Compute the on-disk path for a persistent overlay's upper layer. */
-function getOverlayStateDir(configDir: string, guestPath: string): string {
+export function getOverlayStateDir(configDir: string, guestPath: string): string {
   const stripped = guestPath.replace(/^\//, "");
   const sanitized = stripped === "" ? "_root" : stripped.replace(/\//g, "_");
   return join(configDir, ".state", "overlays", sanitized);
@@ -152,5 +152,4 @@ const defaultResolveDeps: ResolveDeps = {
   ignoreFile: defaultIgnoreFileDeps,
 };
 
-export { resolveConfig, getOverlayStateDir };
-export type { ResolveDeps };
+

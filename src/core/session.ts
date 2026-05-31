@@ -4,7 +4,7 @@ import { buildVfsMounts, type MountSpec } from "./mounts.ts";
 // --- Types ---
 
 /** Core's top-level input contract — everything the session needs to run. */
-type SessionSpec = {
+export type SessionSpec = {
   user: string;
   workdir: string;
   mounts: MountSpec[];
@@ -15,7 +15,7 @@ type SessionSpec = {
 
 // --- Public API ---
 
-async function runSession(spec: SessionSpec): Promise<void> {
+export async function runSession(spec: SessionSpec): Promise<void> {
   const vfsMounts =
     spec.mounts.length > 0 ? buildVfsMounts(spec.mounts) : undefined;
 
@@ -41,5 +41,4 @@ async function runSession(spec: SessionSpec): Promise<void> {
   await vm.close();
 }
 
-export { runSession };
-export type { SessionSpec };
+

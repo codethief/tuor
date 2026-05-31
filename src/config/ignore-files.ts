@@ -4,11 +4,11 @@ import type { ScopedPattern } from "../core/shadow.ts";
 
 // --- Types ---
 
-type IgnoreFileRef =
+export type IgnoreFileRef =
   | { source: "host"; path: string }
   | { source: "mount"; path: string; recursive: boolean };  // recursive is True <=> path must be a filename (not contain any slashes)
 
-type IgnoreFileDeps = {
+export type IgnoreFileDeps = {
   readFile: (path: string) => string;
   pathExists: (path: string) => boolean;
   /** Find all files named `filename` under `rootDir`, returning absolute paths. */
@@ -18,7 +18,7 @@ type IgnoreFileDeps = {
 
 // --- Parsing ---
 
-function parseIgnoreFileRef(ref: string): IgnoreFileRef {
+export function parseIgnoreFileRef(ref: string): IgnoreFileRef {
   const colonIdx = ref.indexOf(":");
   if (colonIdx === -1) {
     throw new Error(
@@ -56,7 +56,7 @@ function parseIgnoreFileRef(ref: string): IgnoreFileRef {
  * Missing ignore files are silently skipped — the user may or may not have
  * created them.
  */
-function collectIgnorePatterns(
+export function collectIgnorePatterns(
   refs: IgnoreFileRef[],
   hostPath: string,
   configDir: string,
@@ -94,7 +94,7 @@ function collectIgnorePatterns(
 }
 
 
-function parseIgnoreFile(contents: string): string[] {
+export function parseIgnoreFile(contents: string): string[] {
   return contents
     .split("\n")
     .map((line) => line.trim())
@@ -131,16 +131,10 @@ function walkFilesRecursive(rootDir: string, filename: string): string[] {
   return results;
 }
 
-const defaultIgnoreFileDeps: IgnoreFileDeps = {
+export const defaultIgnoreFileDeps: IgnoreFileDeps = {
   readFile: (p) => readFileSync(p, "utf-8"),
   pathExists: existsSync,
   walkFiles: walkFilesRecursive,
 };
 
-export {
-  parseIgnoreFile,
-  parseIgnoreFileRef,
-  collectIgnorePatterns,
-  defaultIgnoreFileDeps,
-};
-export type { IgnoreFileRef, IgnoreFileDeps };
+

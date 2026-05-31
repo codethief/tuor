@@ -98,21 +98,14 @@ const _assertMountModeCompat: _SchemaMountMode extends CoreMountMode
   : never = true;
 void _assertMountModeCompat;
 
-type MountConfig = typeof types.MountConfig.infer;
-type NixConfig = typeof types.NixConfig.infer;
-type WorkdirConfig = typeof types.WorkdirConfig.infer;
-type TuorConfig = typeof types.TuorConfig.infer;
-
-export type {
-  MountConfig,
-  NixConfig,
-  TuorConfig,
-  WorkdirConfig,
-};
+export type MountConfig = typeof types.MountConfig.infer;
+export type NixConfig = typeof types.NixConfig.infer;
+export type WorkdirConfig = typeof types.WorkdirConfig.infer;
+export type TuorConfig = typeof types.TuorConfig.infer;
 
 // --- Config discovery ---
 
-function findConfigDir(
+export function findConfigDir(
   startDir: string,
   exists: (path: string) => boolean = existsSync,
 ): string | null {
@@ -131,12 +124,10 @@ function findConfigDir(
 
 // --- Config parsing ---
 
-function parseConfig(raw: unknown): TuorConfig {
+export function parseConfig(raw: unknown): TuorConfig {
   const result = types.TuorConfig(raw);
   if (result instanceof type.errors) {
     throw new Error(result.summary);
   }
   return result;
 }
-
-export { findConfigDir, parseConfig };

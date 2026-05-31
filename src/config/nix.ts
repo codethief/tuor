@@ -4,13 +4,13 @@ import type { MountSpec } from "../core/mounts.ts";
 
 // --- Types ---
 
-type NixSetup = {
+export type NixSetup = {
   mounts: MountSpec[];
   env: Record<string, string>;
   tlsSetupCommand: string;
 };
 
-type NixDeps = {
+export type NixDeps = {
   hostEnv: Record<string, string | undefined>;
   resolveProfiles: () => string[];
   realpath: (path: string) => string;
@@ -20,7 +20,7 @@ type NixDeps = {
 
 // --- Public API ---
 
-function resolveNixSetup(
+export function resolveNixSetup(
   config: NixConfig,
   deps: NixDeps = defaultNixDeps,
 ): NixSetup {
@@ -129,7 +129,7 @@ function buildEnv(
  * via the /nix mount. Entries that don't exist or don't have a bin/ dir are
  * skipped.
  */
-function resolveDefaultProfiles(
+export function resolveDefaultProfiles(
   hostEnv: Record<string, string | undefined>,
 ): string[] {
   const nixProfiles = hostEnv["NIX_PROFILES"];
@@ -159,5 +159,4 @@ const defaultNixDeps: NixDeps = {
   lib64Exists: () => existsSync("/lib64"),
 };
 
-export { resolveNixSetup, resolveDefaultProfiles };
-export type { NixSetup, NixDeps };
+

@@ -7,9 +7,9 @@
  *
  * Unless scope is "/", it must not carry a trailing slash.
  */
-type ScopedPattern = { pattern: string; scope: string };
+export type ScopedPattern = { pattern: string; scope: string };
 
-type ShadowPredicate = (ctx: { op: string; path: string }) => boolean;
+export type ShadowPredicate = (ctx: { op: string; path: string }) => boolean;
 
 type CompiledRule = { anchored: string } | { unanchored: string; scope: string };
 // `anchored`, `unanchored`, `scope` are paths.
@@ -31,7 +31,7 @@ type CompiledRule = { anchored: string } | { unanchored: string; scope: string }
  * In all cases, a match on a path also shadows everything below it
  * (e.g. ".git" shadows ".git/config").
  */
-function buildShadowPredicate(patterns: ScopedPattern[]): ShadowPredicate {
+export function buildShadowPredicate(patterns: ScopedPattern[]): ShadowPredicate {
   const rules: CompiledRule[] = [];
 
   for (const { pattern: rawPattern, scope } of patterns) {
@@ -97,7 +97,3 @@ function doesRuleMatch(rule: CompiledRule, path: string) {
 function matchUnanchored(path: string, unanchored: string): boolean {
   return path.endsWith(`/${unanchored}`) || path.includes(`/${unanchored}/`);
 }
-
-
-export { buildShadowPredicate };
-export type { ScopedPattern, ShadowPredicate };
