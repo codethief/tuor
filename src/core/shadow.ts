@@ -9,7 +9,7 @@
  */
 export type ScopedPattern = { pattern: string; scope: string };
 
-export type ShadowPredicate = (ctx: { op: string; path: string }) => boolean;
+type ShadowPredicate = (ctx: { op: string; path: string }) => boolean;
 
 type CompiledRule = { anchored: string } | { unanchored: string; scope: string };
 // `anchored`, `unanchored`, `scope` are paths.

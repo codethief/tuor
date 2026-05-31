@@ -4,7 +4,7 @@ import type { MountSpec } from "../core/mounts.ts";
 
 // --- Types ---
 
-export type NixSetup = {
+type NixSetup = {
   mounts: MountSpec[];
   env: Record<string, string>;
   tlsSetupCommand: string;
