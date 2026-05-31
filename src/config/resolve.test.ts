@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { resolveConfig, getOverlayStateDir, type ResolveDeps } from "./resolve.ts";
+import { resolveConfig, _getOverlayStateDir, type ResolveDeps } from "./resolve.ts";
 import type { TuorConfig } from "./schema.ts";
 import type { IgnoreFileDeps } from "./ignore-files.ts";
 import type { NixDeps } from "./nix.ts";
@@ -293,27 +293,27 @@ describe("resolveConfig", () => {
   });
 });
 
-describe("getOverlayStateDir", () => {
+describe("_getOverlayStateDir", () => {
   test("sanitizes guest path for use as directory name", () => {
-    expect(getOverlayStateDir("/home/user/.tuor", "/workspace/project")).toBe(
+    expect(_getOverlayStateDir("/home/user/.tuor", "/workspace/project")).toBe(
       "/home/user/.tuor/.state/overlays/workspace_project",
     );
   });
 
   test("handles root guest path", () => {
-    expect(getOverlayStateDir("/home/user/.tuor", "/")).toBe(
+    expect(_getOverlayStateDir("/home/user/.tuor", "/")).toBe(
       "/home/user/.tuor/.state/overlays/_root",
     );
   });
 
   test("handles deeply nested guest path", () => {
-    expect(getOverlayStateDir("/cfg", "/a/b/c/d")).toBe(
+    expect(_getOverlayStateDir("/cfg", "/a/b/c/d")).toBe(
       "/cfg/.state/overlays/a_b_c_d",
     );
   });
 
   test("handles single-segment guest path", () => {
-    expect(getOverlayStateDir("/cfg", "/data")).toBe(
+    expect(_getOverlayStateDir("/cfg", "/data")).toBe(
       "/cfg/.state/overlays/data",
     );
   });

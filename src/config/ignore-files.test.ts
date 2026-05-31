@@ -3,16 +3,16 @@ import { mkdtempSync, mkdirSync, symlinkSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
-  parseIgnoreFile,
+  _parseIgnoreFile,
   parseIgnoreFileRef,
   collectIgnorePatterns,
   defaultIgnoreFileDeps,
   type IgnoreFileDeps,
 } from "./ignore-files.ts";
 
-describe("parseIgnoreFile", () => {
+describe("_parseIgnoreFile", () => {
   test("parses simple paths", () => {
-    expect(parseIgnoreFile(".env\n.git\nnode_modules")).toEqual([
+    expect(_parseIgnoreFile(".env\n.git\nnode_modules")).toEqual([
       ".env",
       ".git",
       "node_modules",
@@ -20,22 +20,22 @@ describe("parseIgnoreFile", () => {
   });
 
   test("skips blank lines and comments", () => {
-    expect(parseIgnoreFile("# comment\n\n.env\n  \n# another\n.git")).toEqual([
+    expect(_parseIgnoreFile("# comment\n\n.env\n  \n# another\n.git")).toEqual([
       ".env",
       ".git",
     ]);
   });
 
   test("trims whitespace from entries", () => {
-    expect(parseIgnoreFile("  .env  \n  .git  ")).toEqual([".env", ".git"]);
+    expect(_parseIgnoreFile("  .env  \n  .git  ")).toEqual([".env", ".git"]);
   });
 
   test("returns empty array for empty input", () => {
-    expect(parseIgnoreFile("")).toEqual([]);
+    expect(_parseIgnoreFile("")).toEqual([]);
   });
 
   test("returns empty array for comments-only input", () => {
-    expect(parseIgnoreFile("# just comments\n# nothing else")).toEqual([]);
+    expect(_parseIgnoreFile("# just comments\n# nothing else")).toEqual([]);
   });
 });
 

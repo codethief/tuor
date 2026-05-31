@@ -70,7 +70,7 @@ export function collectIgnorePatterns(
         const filePath = resolve(configDir, ref.path);
         if (!deps.pathExists(filePath)) continue;
         // host: patterns are scoped to the mount root
-        result.push(...parseIgnoreFile(deps.readFile(filePath)).map(pattern => ({ pattern, scope: "/" })));
+        result.push(..._parseIgnoreFile(deps.readFile(filePath)).map(pattern => ({ pattern, scope: "/" })));
         break;
       }
       case "mount": {
@@ -78,12 +78,12 @@ export function collectIgnorePatterns(
           for (const absPath of deps.walkFiles(hostPath, ref.path)) {
             const dir = relative(hostPath, dirname(absPath));
             const scope = dir === "" ? "/" : `/${dir}`;
-            result.push(...parseIgnoreFile(deps.readFile(absPath)).map(pattern => ({ pattern, scope })));
+            result.push(..._parseIgnoreFile(deps.readFile(absPath)).map(pattern => ({ pattern, scope })));
           }
         } else {
           const filePath = join(hostPath, ref.path);
           if (!deps.pathExists(filePath)) continue;
-          result.push(...parseIgnoreFile(deps.readFile(filePath)).map(pattern => ({ pattern, scope: "/" })));
+          result.push(..._parseIgnoreFile(deps.readFile(filePath)).map(pattern => ({ pattern, scope: "/" })));
         }
         break;
       }
@@ -94,7 +94,7 @@ export function collectIgnorePatterns(
 }
 
 
-export function parseIgnoreFile(contents: string): string[] {
+export function _parseIgnoreFile(contents: string): string[] {
   return contents
     .split("\n")
     .map((line) => line.trim())

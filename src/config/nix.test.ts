@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   resolveNixSetup,
-  resolveDefaultProfiles,
+  _resolveDefaultProfiles,
   type NixDeps,
 } from "./nix.ts";
 
@@ -173,12 +173,12 @@ describe("resolveNixSetup", () => {
   });
 });
 
-describe("resolveDefaultProfiles", () => {
+describe("_resolveDefaultProfiles", () => {
   test("returns empty array when NIX_PROFILES is not set", () => {
-    expect(resolveDefaultProfiles({})).toEqual([]);
+    expect(_resolveDefaultProfiles({})).toEqual([]);
   });
 
   test("returns empty array for empty NIX_PROFILES", () => {
-    expect(resolveDefaultProfiles({ NIX_PROFILES: "" })).toEqual([]);
+    expect(_resolveDefaultProfiles({ NIX_PROFILES: "" })).toEqual([]);
   });
 });

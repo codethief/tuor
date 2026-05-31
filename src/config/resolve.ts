@@ -109,7 +109,7 @@ function resolveMountConfig(
     mode: m.mode,
     shadowPatterns,
     ...(m.mode === "overlay"
-      ? { overlayStateDir: getOverlayStateDir(configDir, guestPath) }
+      ? { overlayStateDir: _getOverlayStateDir(configDir, guestPath) }
       : {}),
   };
 }
@@ -136,7 +136,7 @@ function resolveWorkdir(
 }
 
 /** Compute the on-disk path for a persistent overlay's upper layer. */
-export function getOverlayStateDir(configDir: string, guestPath: string): string {
+export function _getOverlayStateDir(configDir: string, guestPath: string): string {
   const stripped = guestPath.replace(/^\//, "");
   const sanitized = stripped === "" ? "_root" : stripped.replace(/\//g, "_");
   return join(configDir, ".state", "overlays", sanitized);

@@ -129,7 +129,7 @@ function buildEnv(
  * via the /nix mount. Entries that don't exist or don't have a bin/ dir are
  * skipped.
  */
-export function resolveDefaultProfiles(
+export function _resolveDefaultProfiles(
   hostEnv: Record<string, string | undefined>,
 ): string[] {
   const nixProfiles = hostEnv["NIX_PROFILES"];
@@ -153,7 +153,7 @@ export function resolveDefaultProfiles(
 
 const defaultNixDeps: NixDeps = {
   hostEnv: process.env,
-  resolveProfiles: () => resolveDefaultProfiles(process.env),
+  resolveProfiles: () => _resolveDefaultProfiles(process.env),
   realpath: realpathSync,
   nixExists: () => existsSync("/nix"),
   lib64Exists: () => existsSync("/lib64"),
