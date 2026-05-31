@@ -16,6 +16,7 @@ export type NixDeps = {
   realpath: (path: string) => string;
   nixExists: () => boolean;
   lib64Exists: () => boolean;
+  warn: (message: string) => void;
 };
 
 // --- Public API ---
@@ -39,7 +40,7 @@ export function resolveNixSetup(
 
   return {
     mounts: buildMounts(config, deps),
-    env: buildEnv(profiles, deps.hostEnv),
+    env: buildEnv(profiles, deps.hostEnv, deps.realpath, deps.warn),
     tlsSetupCommand: TLS_SETUP_COMMAND,
   };
 }
@@ -53,14 +54,19 @@ const TLS_SETUP_COMMAND = [
   `> ${COMBINED_CA_BUNDLE}`,
 ].join(" ");
 
-/** Env vars to forward from the host if present. */
-const FORWARDED_ENV_VARS = [
-  "NIX_LD_LIBRARY_PATH",
-  "LOCALE_ARCHIVE",
-  "TZDIR",
-] as const;
-// TODO These env vars usually don't point to /nix, but to /run/current-system &
-// friends, so as of today won't be available in the guest.
+/**
+ * Env vars to forward from the host, resolved through symlinks so they point
+ * into /nix/store (which is mounted in the guest). Entries whose resolved path
+ * doesn't land under /nix/ are dropped with a warning.
+ *
+ * "path-list" vars (like NIX_LD_LIBRARY_PATH) are colon-separated; each
+ * component is resolved individually and non-/nix/ entries are filtered out.
+ */
+const FORWARDED_ENV_VARS: { key: string; kind: "path" | "path-list" }[] = [
+  { key: "NIX_LD_LIBRARY_PATH", kind: "path-list" },
+  { key: "LOCALE_ARCHIVE", kind: "path" },
+  { key: "TZDIR", kind: "path" },
+];
 
 
 /**
@@ -103,6 +109,8 @@ function buildMounts(config: NixConfig, deps: NixDeps): MountSpec[] {
 function buildEnv(
   profiles: string[],
   hostEnv: Record<string, string | undefined>,
+  realpath: (path: string) => string,
+  warn: (message: string) => void,
 ): Record<string, string> {
   const pathEntries = profiles.map((p) => `${p}/bin`);
 
@@ -111,14 +119,52 @@ function buildEnv(
     NIX_SSL_CERT_FILE: COMBINED_CA_BUNDLE,
   };
 
-  for (const key of FORWARDED_ENV_VARS) {
+  for (const { key, kind } of FORWARDED_ENV_VARS) {
     const value = hostEnv[key];
-    if (value !== undefined) {
-      env[key] = value;
+    if (value === undefined) continue;
+
+    if (kind === "path") {
+      const resolved = resolveToNixStore(value, key, realpath, warn);
+      if (resolved !== undefined) {
+        env[key] = resolved;
+      }
+    } else {
+      const entries = value.split(":").filter(Boolean);
+      const resolved = entries
+        .map((entry) => resolveToNixStore(entry, key, realpath, warn))
+        .filter((r): r is string => r !== undefined);
+      if (resolved.length > 0) {
+        env[key] = resolved.join(":");
+      }
     }
   }
 
   return env;
+}
+
+/**
+ * Resolve a path through symlinks; return it only if it lands under /nix/.
+ * Warns when a path is dropped (doesn't resolve under /nix/ or doesn't exist).
+ */
+function resolveToNixStore(
+  path: string,
+  envVar: string,
+  realpath: (p: string) => string,
+  warn: (message: string) => void,
+): string | undefined {
+  try {
+    const resolved = realpath(path);
+    if (resolved.startsWith("/nix/")) {
+      return resolved;
+    }
+    warn(
+      `${envVar}: dropping "${path}" (resolves to "${resolved}", which is not under /nix/)`,
+    );
+    return undefined;
+  } catch {
+    warn(`${envVar}: dropping "${path}" (path does not exist)`);
+    return undefined;
+  }
 }
 
 // --- Default deps ---
@@ -157,6 +203,7 @@ const defaultNixDeps: NixDeps = {
   realpath: realpathSync,
   nixExists: () => existsSync("/nix"),
   lib64Exists: () => existsSync("/lib64"),
+  warn: (message) => console.warn(`[nix] ${message}`),
 };
 
 

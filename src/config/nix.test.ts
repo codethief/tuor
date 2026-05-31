@@ -11,6 +11,7 @@ const baseDeps: NixDeps = {
   realpath: (p) => p,
   nixExists: () => true,
   lib64Exists: () => true,
+  warn: () => {},
 };
 
 function deps(overrides: Partial<NixDeps> = {}): NixDeps {
@@ -128,12 +129,65 @@ describe("resolveNixSetup", () => {
       expect(env.NIX_SSL_CERT_FILE).toBe("/run/gondolin/nix-ca-bundle.crt");
     });
 
-    test("forwards NIX_LD_LIBRARY_PATH from host when present", () => {
+    test("resolves NIX_LD_LIBRARY_PATH entries through symlinks", () => {
       const { env } = resolveNixSetup(
         { nixLd: false },
-        deps({ hostEnv: { NIX_LD_LIBRARY_PATH: "/nix/store/libs" } }),
+        deps({
+          hostEnv: { NIX_LD_LIBRARY_PATH: "/run/current-system/sw/lib" },
+          realpath: (p) =>
+            p === "/run/current-system/sw/lib"
+              ? "/nix/store/abc-libs/lib"
+              : p,
+        }),
       );
-      expect(env.NIX_LD_LIBRARY_PATH).toBe("/nix/store/libs");
+      expect(env.NIX_LD_LIBRARY_PATH).toBe("/nix/store/abc-libs/lib");
+    });
+
+    test("resolves multiple colon-separated NIX_LD_LIBRARY_PATH entries", () => {
+      const { env } = resolveNixSetup(
+        { nixLd: false },
+        deps({
+          hostEnv: {
+            NIX_LD_LIBRARY_PATH: "/run/current-system/sw/lib:/run/current-system/sw/lib64",
+          },
+          realpath: (p) => {
+            const map: Record<string, string> = {
+              "/run/current-system/sw/lib": "/nix/store/abc/lib",
+              "/run/current-system/sw/lib64": "/nix/store/xyz/lib64",
+            };
+            return map[p] ?? p;
+          },
+        }),
+      );
+      expect(env.NIX_LD_LIBRARY_PATH).toBe(
+        "/nix/store/abc/lib:/nix/store/xyz/lib64",
+      );
+    });
+
+    test("filters out NIX_LD_LIBRARY_PATH entries that don't resolve under /nix/", () => {
+      const { env } = resolveNixSetup(
+        { nixLd: false },
+        deps({
+          hostEnv: {
+            NIX_LD_LIBRARY_PATH: "/usr/lib:/run/current-system/sw/lib",
+          },
+          realpath: (p) =>
+            p === "/run/current-system/sw/lib"
+              ? "/nix/store/abc/lib"
+              : p,
+        }),
+      );
+      expect(env.NIX_LD_LIBRARY_PATH).toBe("/nix/store/abc/lib");
+    });
+
+    test("omits NIX_LD_LIBRARY_PATH entirely when no entries resolve under /nix/", () => {
+      const { env } = resolveNixSetup(
+        { nixLd: false },
+        deps({
+          hostEnv: { NIX_LD_LIBRARY_PATH: "/usr/lib" },
+        }),
+      );
+      expect(env).not.toHaveProperty("NIX_LD_LIBRARY_PATH");
     });
 
     test("omits NIX_LD_LIBRARY_PATH when not on host", () => {
@@ -141,25 +195,94 @@ describe("resolveNixSetup", () => {
       expect(env).not.toHaveProperty("NIX_LD_LIBRARY_PATH");
     });
 
-    test("forwards LOCALE_ARCHIVE from host when present", () => {
+    test("resolves LOCALE_ARCHIVE through symlinks", () => {
       const { env } = resolveNixSetup(
         { nixLd: false },
-        deps({ hostEnv: { LOCALE_ARCHIVE: "/nix/store/locales" } }),
+        deps({
+          hostEnv: { LOCALE_ARCHIVE: "/run/current-system/sw/lib/locale/locale-archive" },
+          realpath: (p) =>
+            p === "/run/current-system/sw/lib/locale/locale-archive"
+              ? "/nix/store/abc-glibc/lib/locale/locale-archive"
+              : p,
+        }),
       );
-      expect(env.LOCALE_ARCHIVE).toBe("/nix/store/locales");
+      expect(env.LOCALE_ARCHIVE).toBe("/nix/store/abc-glibc/lib/locale/locale-archive");
     });
 
-    test("forwards TZDIR from host when present", () => {
+    test("drops LOCALE_ARCHIVE when it doesn't resolve under /nix/", () => {
       const { env } = resolveNixSetup(
         { nixLd: false },
-        deps({ hostEnv: { TZDIR: "/nix/store/tzdata" } }),
+        deps({
+          hostEnv: { LOCALE_ARCHIVE: "/usr/lib/locale/locale-archive" },
+        }),
       );
-      expect(env.TZDIR).toBe("/nix/store/tzdata");
+      expect(env).not.toHaveProperty("LOCALE_ARCHIVE");
+    });
+
+    test("resolves TZDIR through symlinks", () => {
+      const { env } = resolveNixSetup(
+        { nixLd: false },
+        deps({
+          hostEnv: { TZDIR: "/run/current-system/sw/share/zoneinfo" },
+          realpath: (p) =>
+            p === "/run/current-system/sw/share/zoneinfo"
+              ? "/nix/store/xyz-tzdata/share/zoneinfo"
+              : p,
+        }),
+      );
+      expect(env.TZDIR).toBe("/nix/store/xyz-tzdata/share/zoneinfo");
     });
 
     test("omits absent host env vars", () => {
       const { env } = resolveNixSetup({ nixLd: false }, deps({ hostEnv: {} }));
       expect(Object.keys(env)).toEqual(["PATH", "NIX_SSL_CERT_FILE"]);
+    });
+
+    test("warns when a path doesn't resolve under /nix/", () => {
+      const warnings: string[] = [];
+      resolveNixSetup(
+        { nixLd: false },
+        deps({
+          hostEnv: { LOCALE_ARCHIVE: "/usr/lib/locale/locale-archive" },
+          warn: (msg) => warnings.push(msg),
+        }),
+      );
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("LOCALE_ARCHIVE");
+      expect(warnings[0]).toContain("/usr/lib/locale/locale-archive");
+      expect(warnings[0]).toContain("not under /nix/");
+    });
+
+    test("warns when a path does not exist", () => {
+      const warnings: string[] = [];
+      resolveNixSetup(
+        { nixLd: false },
+        deps({
+          hostEnv: { TZDIR: "/no/such/path" },
+          realpath: (p) => {
+            if (p === "/no/such/path") throw new Error("ENOENT");
+            return p;
+          },
+          warn: (msg) => warnings.push(msg),
+        }),
+      );
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("TZDIR");
+      expect(warnings[0]).toContain("does not exist");
+    });
+
+    test("warns for each dropped entry in a path-list", () => {
+      const warnings: string[] = [];
+      resolveNixSetup(
+        { nixLd: false },
+        deps({
+          hostEnv: { NIX_LD_LIBRARY_PATH: "/usr/lib:/opt/lib" },
+          warn: (msg) => warnings.push(msg),
+        }),
+      );
+      expect(warnings).toHaveLength(2);
+      expect(warnings[0]).toContain("/usr/lib");
+      expect(warnings[1]).toContain("/opt/lib");
     });
   });
 

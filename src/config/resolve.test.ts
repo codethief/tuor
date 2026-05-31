@@ -216,6 +216,7 @@ describe("resolveConfig", () => {
       realpath: (p) => p,
       nixExists: () => true,
       lib64Exists: () => true,
+      warn: () => {},
     };
 
     test("prepends nix mounts before user mounts", () => {
