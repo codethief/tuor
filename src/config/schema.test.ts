@@ -149,6 +149,39 @@ describe("parseConfig", () => {
     });
   });
 
+  test("accepts env with secret (fromHost: true)", () => {
+    const config = parseConfig({
+      env: { API_KEY: { secret: true, fromHost: true, hosts: ["api.example.com"] } },
+    });
+    expect(config.env).toEqual({
+      API_KEY: { secret: true, fromHost: true, hosts: ["api.example.com"] },
+    });
+  });
+
+  test("accepts env with secret (fromHost: string)", () => {
+    const config = parseConfig({
+      env: { GH_TOKEN: { secret: true, fromHost: "GITHUB_TOKEN", hosts: ["*.github.com"] } },
+    });
+    expect(config.env).toEqual({
+      GH_TOKEN: { secret: true, fromHost: "GITHUB_TOKEN", hosts: ["*.github.com"] },
+    });
+  });
+
+  test("accepts env mixing literals, fromHost, and secrets", () => {
+    const config = parseConfig({
+      env: {
+        FIXED: "value",
+        EDITOR: { fromHost: true },
+        API_KEY: { secret: true, fromHost: true, hosts: ["api.example.com"] },
+      },
+    });
+    expect(config.env).toEqual({
+      FIXED: "value",
+      EDITOR: { fromHost: true },
+      API_KEY: { secret: true, fromHost: true, hosts: ["api.example.com"] },
+    });
+  });
+
   test("omits env when not specified", () => {
     const config = parseConfig({});
     expect(config.env).toBeUndefined();
@@ -222,6 +255,9 @@ describe("parseConfig", () => {
     ["env with fromHost: number", { env: { X: { fromHost: 123 } } }],
     ["env with fromHost: empty string", { env: { X: { fromHost: "" } } }],
     ["env with unknown source key", { env: { X: { badKey: true } } }],
+    ["secret without hosts", { env: { X: { secret: true, fromHost: true } } }],
+    ["secret with empty hosts", { env: { X: { secret: true, fromHost: true, hosts: [] } } }],
+    ["secret without fromHost", { env: { X: { secret: true, hosts: ["h"] } } }],
   ])("rejects %s", (_label, raw) => {
     expect(() => parseConfig(raw)).toThrow();
   });

@@ -1,6 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import type { NetworkSpec, SessionSpec } from "../core/session.ts";
+import type { NetworkSpec, SecretSpec, SessionSpec } from "../core/session.ts";
 import type { MountSpec, MountValidationDeps } from "../core/mounts.ts";
 import { validateMounts } from "../core/mounts.ts";
 import type { ScopedPattern } from "../core/shadow.ts";
@@ -64,11 +64,12 @@ export function resolveConfig(
 
   // Resolve env: user env wins over nix env
   const nixEnv = nixSetup?.env ?? {};
-  const userEnv = config.env
+  const { env: userEnv, secrets } = config.env
     ? _resolveEnv(config.env, deps.hostEnv, deps.warn)
-    : {};
+    : { env: {}, secrets: {} };
   const mergedEnv = { ...nixEnv, ...userEnv };
   const hasEnv = Object.keys(mergedEnv).length > 0;
+  const hasSecrets = Object.keys(secrets).length > 0;
 
   const network = resolveNetwork(config.network);
 
@@ -79,6 +80,7 @@ export function resolveConfig(
     mounts: allMounts,
     ...(config.rootfsSize ? { rootfsSize: config.rootfsSize } : {}),
     ...(hasEnv ? { env: mergedEnv } : {}),
+    ...(hasSecrets ? { secrets } : {}),
   };
 }
 
@@ -124,26 +126,40 @@ function resolveMountConfig(
   };
 }
 
+export type ResolvedEnv = {
+  env: Record<string, string>;
+  secrets: Record<string, SecretSpec>;
+};
+
 export function _resolveEnv(
   env: Record<string, EnvValue>,
   hostEnv: Record<string, string | undefined>,
   warn: (message: string) => void,
-): Record<string, string> {
+): ResolvedEnv {
   const resolved: Record<string, string> = {};
+  const secrets: Record<string, SecretSpec> = {};
+
   for (const [key, value] of Object.entries(env)) {
     if (typeof value === "string") {
       resolved[key] = value;
+      continue;
+    }
+
+    const hostKey = value.fromHost === true ? key : value.fromHost;
+    const hostValue = hostEnv[hostKey];
+    if (hostValue === undefined) {
+      warn(`env var "${key}": host variable "${hostKey}" is not set, skipping`);
+      continue;
+    }
+
+    if ("secret" in value) {
+      secrets[key] = { hosts: value.hosts, value: hostValue };
     } else {
-      const hostKey = value.fromHost === true ? key : value.fromHost;
-      const hostValue = hostEnv[hostKey];
-      if (hostValue === undefined) {
-        warn(`env var "${key}": host variable "${hostKey}" is not set, skipping`);
-      } else {
-        resolved[key] = hostValue;
-      }
+      resolved[key] = hostValue;
     }
   }
-  return resolved;
+
+  return { env: resolved, secrets };
 }
 
 function resolveWorkdir(

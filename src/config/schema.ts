@@ -62,10 +62,22 @@ const types = scope({
    * - `{ fromHost: "OTHER_NAME" }` reads OTHER_NAME from the host env
    */
   EnvValueFromHost: {
+    "+": "reject",
     "fromHost": "string > 0 | true",
   },
-  /** An env var value: either a literal string or a source descriptor. */
-  EnvValue: "string | EnvValueFromHost",
+  /**
+   * Env var injected as a Gondolin secret: the guest sees a placeholder; the
+   * real value is substituted only in HTTP requests to the listed hosts.
+   */
+  EnvSecret: {
+    "+": "reject",
+    secret: "true",
+    fromHost: "string > 0 | true",
+    /** Host patterns allowed to receive this secret (wildcard supported). */
+    hosts: "string[] > 0",
+  },
+  /** An env var value: literal, host-sourced, or a secret. */
+  EnvValue: "string | EnvValueFromHost | EnvSecret",
   /**
    * Working directory inside the guest. Either just a guest path (string) to cd
    * into, or a full mount config (which also sets up the host→guest mount and
@@ -124,6 +136,7 @@ export type MountConfig = typeof types.MountConfig.infer;
 export type NixConfig = typeof types.NixConfig.infer;
 export type NetworkConfig = typeof types.NetworkConfig.infer;
 export type EnvValueFromHost = typeof types.EnvValueFromHost.infer;
+export type EnvSecret = typeof types.EnvSecret.infer;
 export type EnvValue = typeof types.EnvValue.infer;
 export type WorkdirConfig = typeof types.WorkdirConfig.infer;
 export type TuorConfig = typeof types.TuorConfig.infer;
