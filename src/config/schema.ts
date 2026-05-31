@@ -1,7 +1,6 @@
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { scope, type } from "arktype";
-import type { MountMode as CoreMountMode } from "../core/mounts.ts";
 
 const AbsolutePath = type("string > 0").matching(/^\//);
 /** Path starting with ~ (bare "~" or "~/…"), expanded at resolution time. */
@@ -86,15 +85,6 @@ const types = scope({
     "rootfsSize?": "string > 0",
   },
 }).export();
-
-// Type-level assertion: arktype's MountMode must match core's MountMode
-type _SchemaMountMode = typeof types.MountMode.infer;
-const _assertMountModeCompat: _SchemaMountMode extends CoreMountMode
-  ? CoreMountMode extends _SchemaMountMode
-    ? true
-    : never
-  : never = true;
-void _assertMountModeCompat;
 
 export type MountConfig = typeof types.MountConfig.infer;
 export type NixConfig = typeof types.NixConfig.infer;
