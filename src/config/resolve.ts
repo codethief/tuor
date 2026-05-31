@@ -1,6 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import type { SessionSpec } from "../core/session.ts";
+import type { NetworkSpec, SessionSpec } from "../core/session.ts";
 import type { MountSpec, MountValidationDeps } from "../core/mounts.ts";
 import { validateMounts } from "../core/mounts.ts";
 import type { ScopedPattern } from "../core/shadow.ts";
@@ -70,9 +70,12 @@ export function resolveConfig(
   const mergedEnv = { ...nixEnv, ...userEnv };
   const hasEnv = Object.keys(mergedEnv).length > 0;
 
+  const network = resolveNetwork(config.network);
+
   return {
     user: config.user,
     workdir: guestWorkdir,
+    network,
     mounts: allMounts,
     ...(config.rootfsSize ? { rootfsSize: config.rootfsSize } : {}),
     ...(hasEnv ? { env: mergedEnv } : {}),
@@ -162,6 +165,20 @@ function resolveWorkdir(
     guestWorkdir,
     workdirMount: workdir,
   };
+}
+
+function resolveNetwork(network: TuorConfig["network"]): NetworkSpec {
+  if (!network) {
+    return { mode: "restricted", allowedHosts: [], allowedInternalHosts: [] }
+  } else if (network.mode === "open") {
+    return network;
+  } else {
+    return {
+      mode: "restricted",
+      allowedHosts: network.allowedHosts ?? [],
+      allowedInternalHosts: network.allowedInternalHosts ?? [],
+    };
+  }
 }
 
 /** Compute the on-disk path for a persistent overlay's upper layer. */

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { findConfigDir, parseConfig } from "./schema.ts";
 
+
 describe("findConfigDir", () => {
   test("returns config dir when config.json exists in start directory", () => {
     const exists = (path: string) => path === "/project/.tuor/config.json";
@@ -22,6 +23,7 @@ describe("parseConfig", () => {
   test("parses a fully-populated config with correct defaults", () => {
     const raw = {
       user: "dev",
+      network: { mode: "restricted", allowedHosts: ["*.github.com"] },
       workdir: { hostPath: "/host/project", guestPath: "/workspace" },
       mounts: [
         { hostPath: "/data", guestPath: "/mnt/data", mode: "readwrite" },
@@ -35,6 +37,7 @@ describe("parseConfig", () => {
     const config = parseConfig(raw);
     expect(config).toMatchObject({
       user: "dev",
+      network: { mode: "restricted", allowedHosts: ["*.github.com"] },
       workdir: {
         hostPath: "/host/project",
         guestPath: "/workspace",
@@ -55,6 +58,7 @@ describe("parseConfig", () => {
     const config = parseConfig({});
     expect(config.user).toBe("root");
     expect(config.workdir).toBe("/");
+    expect(config.network).toBeUndefined();
     expect(config.mounts).toBeUndefined();
     expect(config.nix).toBeUndefined();
   });
@@ -148,6 +152,61 @@ describe("parseConfig", () => {
   test("omits env when not specified", () => {
     const config = parseConfig({});
     expect(config.env).toBeUndefined();
+  });
+
+  describe("network config", () => {
+    test("accepts open mode", () => {
+      const config = parseConfig({ network: { mode: "open" } });
+      expect(config.network).toEqual({ mode: "open" });
+    });
+
+    test("accepts restricted mode with allowedHosts", () => {
+      const config = parseConfig({
+        network: { mode: "restricted", allowedHosts: ["*.github.com", "api.anthropic.com"] },
+      });
+      expect(config.network).toEqual({
+        mode: "restricted",
+        allowedHosts: ["*.github.com", "api.anthropic.com"],
+      });
+    });
+
+    test("accepts restricted mode with empty allowedHosts (block all)", () => {
+      const config = parseConfig({
+        network: { mode: "restricted", allowedHosts: [] },
+      });
+      expect(config.network).toEqual({ mode: "restricted", allowedHosts: [] });
+    });
+
+    test("accepts restricted mode with allowedInternalHosts", () => {
+      const config = parseConfig({
+        network: {
+          mode: "restricted",
+          allowedHosts: ["api.example.com"],
+          allowedInternalHosts: ["litellm.corp.internal"],
+        },
+      });
+      expect(config.network).toEqual({
+        mode: "restricted",
+        allowedHosts: ["api.example.com"],
+        allowedInternalHosts: ["litellm.corp.internal"],
+      });
+    });
+
+    test("omits allowedInternalHosts when not specified", () => {
+      const config = parseConfig({
+        network: { mode: "restricted", allowedHosts: [] },
+      });
+      expect(config.network).not.toHaveProperty("allowedInternalHosts");
+    });
+
+    test("accepts restricted mode without allowedHosts", () => {
+      const config = parseConfig({ network: { mode: "restricted" } });
+      expect(config.network).toEqual({ mode: "restricted" });
+    });
+
+    test("rejects unknown network mode", () => {
+      expect(() => parseConfig({ network: { mode: "custom" } })).toThrow();
+    });
   });
 
   test.each([

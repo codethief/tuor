@@ -250,6 +250,48 @@ describe("resolveConfig", () => {
     });
   });
 
+  describe("network", () => {
+    test("defaults to restricted with empty allowlists", () => {
+      const spec = resolve({});
+      expect(spec.network).toEqual({
+        mode: "restricted",
+        allowedHosts: [],
+        allowedInternalHosts: [],
+      });
+    });
+
+    test("passes through open network config", () => {
+      const spec = resolve({ network: { mode: "open" } });
+      expect(spec.network).toEqual({ mode: "open" });
+    });
+
+    test("passes through restricted network config and defaults allowedInternalHosts", () => {
+      const spec = resolve({
+        network: { mode: "restricted", allowedHosts: ["*.github.com"] },
+      });
+      expect(spec.network).toEqual({
+        mode: "restricted",
+        allowedHosts: ["*.github.com"],
+        allowedInternalHosts: [],
+      });
+    });
+
+    test("passes through allowedInternalHosts", () => {
+      const spec = resolve({
+        network: {
+          mode: "restricted",
+          allowedHosts: ["api.example.com"],
+          allowedInternalHosts: ["litellm.corp.internal"],
+        },
+      });
+      expect(spec.network).toEqual({
+        mode: "restricted",
+        allowedHosts: ["api.example.com"],
+        allowedInternalHosts: ["litellm.corp.internal"],
+      });
+    });
+  });
+
   describe("other fields", () => {
     test("passes through user", () => {
       const spec = resolve({ user: "dev" });

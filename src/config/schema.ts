@@ -72,6 +72,26 @@ const types = scope({
    * then cd's into the guest path).
    */
   WorkdirConfig: "AbsolutePath | TildePath | MountConfig",
+  /** Network mode: unrestricted access or restricted to an allowlist. */
+  NetworkConfig: [
+    { mode: "'open'" },
+    "|",
+    {
+      mode: "'restricted'",
+      /**
+       * Host patterns allowed for HTTPS egress (wildcard supported, e.g.
+       * "*.github.com"). Gondolin's createHttpHooks handles matching.
+       */
+      "allowedHosts?": "string[]",
+      /**
+       * Internal hosts to be exempted from Gondolin's blockInternalRanges
+       * features, which disallows traffic to internal/private IP ranges
+       * (RFC1918, loopback, etc.). Uses the same wildcard syntax as
+       * allowedHosts.
+       */
+      "allowedInternalHosts?": "string[]",
+    },
+  ],
   TuorConfig: {
     /**
      * When `nix` is given (even if "empty", i.e. just {}), Nix support will be
@@ -80,6 +100,8 @@ const types = scope({
     "nix?": "NixConfig",
     /** The user to open the shell under and to make mounted directories available for. */
     "user": "string > 0 = 'root'",
+    /** Network egress policy for the VM. Defaults to restricted (block all). */
+    "network?": "NetworkConfig",
     /** Environment variables to set in the guest. */
     "env?": { "[string]": "EnvValue" },
     "mounts?": "MountConfig[]",
@@ -100,6 +122,7 @@ const types = scope({
 
 export type MountConfig = typeof types.MountConfig.infer;
 export type NixConfig = typeof types.NixConfig.infer;
+export type NetworkConfig = typeof types.NetworkConfig.infer;
 export type EnvValueFromHost = typeof types.EnvValueFromHost.infer;
 export type EnvValue = typeof types.EnvValue.infer;
 export type WorkdirConfig = typeof types.WorkdirConfig.infer;

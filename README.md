@@ -31,6 +31,11 @@ host-side mounts on top. Example config:
 ```javascript
 {
   "user": "root",  // User must currently be root or the user with UID 1000 (or whatever UID you use on the host), see https://github.com/earendil-works/gondolin/issues/74
+  "network": {  // Optional: network egress policy (default: restricted, block all)
+    "mode": "restricted",  // "open" for unrestricted access, "restricted" for allowlist
+    "allowedHosts": ["*.github.com", "api.anthropic.com"],  // Allow HTTPS traffic to these hosts
+    "allowedInternalHosts": ["local-llm.my.corp"]  // Like allowedHosts but for hosts pointing at private IPs (which are otherwise blocked to prevent DNS rebinding attacks)
+  },
   "workdir": {
       "hostPath": "..",  // relative to config.json
       "guestPath": "/workspace"  // Can be omitted, in which case guestPath will be set to the resolved (absolute) hostPath
