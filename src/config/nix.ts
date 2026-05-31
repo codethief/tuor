@@ -59,6 +59,9 @@ const FORWARDED_ENV_VARS = [
   "LOCALE_ARCHIVE",
   "TZDIR",
 ] as const;
+// TODO These env vars usually don't point to /nix, but to /run/current-system &
+// friends, so as of today won't be available in the guest.
+
 
 /**
  * Resolve explicit profile paths to their real paths, validating that each
