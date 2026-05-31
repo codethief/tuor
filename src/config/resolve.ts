@@ -7,6 +7,7 @@ import type { ScopedPattern } from "../core/shadow.ts";
 import type { EnvValue, MountConfig, VolumeConfig, TuorConfig, WorkdirConfig } from "./schema.ts";
 import { expandTilde, inferGuestHomeDir } from "./homedir.ts";
 import {
+  DEFAULT_IGNORE_FILE_REFS,
   parseIgnoreFileRef,
   collectIgnorePatterns,
   defaultIgnoreFileDeps,
@@ -91,8 +92,6 @@ export function resolveConfig(
 }
 
 // --- Internals ---
-
-const DEFAULT_IGNORE_FILE_REFS = ["host:./tuorignore", "mount:.tuorignore"];
 
 function resolveMountConfig(
   m: MountConfig,

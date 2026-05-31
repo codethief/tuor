@@ -8,6 +8,8 @@ export type IgnoreFileRef =
   | { source: "host"; path: string }
   | { source: "mount"; path: string; recursive: boolean };  // recursive is True <=> path must be a filename (not contain any slashes)
 
+export const DEFAULT_IGNORE_FILE_REFS = ["host:./tuorignore", "mount:.tuorignore"];
+
 export type IgnoreFileDeps = {
   readFile: (path: string) => string;
   pathExists: (path: string) => boolean;
