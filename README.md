@@ -54,6 +54,10 @@ host-side mounts on top. Example config:
       "ignore": [".env", "secrets"],  // Optional: explicit paths to hide from the guest
       "ignoreFileRefs": ["host:./tuorignore", "mount:.tuorignore"]  // Optional, shown here with default value
     }
+  ],
+  // Optional: persistent guest directories without a host backing directory (similar to Docker volumes)
+  "volumes": [
+    { "guestPath": "~/.claude" }
   ]
 }
 ```
@@ -90,6 +94,18 @@ mount. Missing ignore files are silently skipped.
 ### Caveats
 
 Ignore files are loaded once at boot. Changes require a VM restart.
+
+
+## Volumes
+
+Volumes are persistent guest directories without a host backing directory —
+similar to Docker volumes. Data is stored on the host in
+`.tuor/.state/overlays/<sanitized guest path>` and persists across VM rebuilds.
+
+Unlike mounts, volumes have no `hostPath`, no ignore patterns, and no mode
+selection — they are always read-write.
+
+Guest paths across mounts and volumes must not collide.
 
 
 # Development

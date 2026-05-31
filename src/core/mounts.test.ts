@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import {
   validateMounts,
   buildVfsMounts,
+  buildVfsVolumes,
   type MountSpec,
+  type VolumeSpec,
   type MountValidationDeps,
 } from "./mounts.ts";
 import {
@@ -25,7 +27,7 @@ describe("validateMounts", () => {
     const mounts: MountSpec[] = [
       { hostPath: "/opt/data", guestPath: "/data", mode: "readwrite", shadowPatterns: [] },
     ];
-    expect(() => validateMounts(mounts, validDeps)).not.toThrow();
+    expect(() => validateMounts(mounts, [], validDeps)).not.toThrow();
   });
 
   test("throws when path does not exist", () => {
@@ -36,7 +38,7 @@ describe("validateMounts", () => {
     const mounts: MountSpec[] = [
       { hostPath: "/nonexistent", guestPath: "/data", mode: "readwrite", shadowPatterns: [] },
     ];
-    expect(() => validateMounts(mounts, deps)).toThrow(
+    expect(() => validateMounts(mounts, [], deps)).toThrow(
       "Mount host path does not exist: /nonexistent",
     );
   });
@@ -49,7 +51,7 @@ describe("validateMounts", () => {
     const mounts: MountSpec[] = [
       { hostPath: "/some/file.txt", guestPath: "/data", mode: "readwrite", shadowPatterns: [] },
     ];
-    expect(() => validateMounts(mounts, deps)).toThrow(
+    expect(() => validateMounts(mounts, [], deps)).toThrow(
       "Mount host path is not a directory: /some/file.txt",
     );
   });
@@ -59,7 +61,7 @@ describe("validateMounts", () => {
       { hostPath: "/a", guestPath: "/data", mode: "readwrite", shadowPatterns: [] },
       { hostPath: "/b", guestPath: "/data", mode: "readwrite", shadowPatterns: [] },
     ];
-    expect(() => validateMounts(mounts, validDeps)).toThrow(
+    expect(() => validateMounts(mounts, [], validDeps)).toThrow(
       "Duplicate guest mount path: /data",
     );
   });
@@ -154,5 +156,77 @@ describe("buildVfsMounts", () => {
       { hostPath: "/tmp", guestPath: "/workspace", mode: "overlay", shadowPatterns: [] },
     ];
     expect(() => buildVfsMounts(mounts)).toThrow(/missing overlayStateDir/);
+  });
+});
+
+describe("validateMounts with volumes", () => {
+  const validDeps: MountValidationDeps = {
+    pathExists: () => true,
+    isDirectory: () => true,
+  };
+
+  test("passes when mount and volume guestPaths are distinct", () => {
+    const mounts: MountSpec[] = [
+      { hostPath: "/opt/data", guestPath: "/data", mode: "readwrite", shadowPatterns: [] },
+    ];
+    const volumes: VolumeSpec[] = [
+      { guestPath: "/cache", stateDir: "/tmp/state/cache" },
+    ];
+    expect(() => validateMounts(mounts, volumes, validDeps)).not.toThrow();
+  });
+
+  test("throws when volume guestPath collides with mount guestPath", () => {
+    const mounts: MountSpec[] = [
+      { hostPath: "/opt/data", guestPath: "/data", mode: "readwrite", shadowPatterns: [] },
+    ];
+    const volumes: VolumeSpec[] = [
+      { guestPath: "/data", stateDir: "/tmp/state/data" },
+    ];
+    expect(() => validateMounts(mounts, volumes, validDeps)).toThrow(
+      "Duplicate guest mount path: /data",
+    );
+  });
+
+  test("throws when two volumes have the same guestPath", () => {
+    const volumes: VolumeSpec[] = [
+      { guestPath: "/cache", stateDir: "/tmp/state/cache1" },
+      { guestPath: "/cache", stateDir: "/tmp/state/cache2" },
+    ];
+    expect(() => validateMounts([], volumes, validDeps)).toThrow(
+      "Duplicate guest mount path: /cache",
+    );
+  });
+});
+
+describe("buildVfsVolumes", () => {
+  test("creates RealFSProvider backed by state directory", () => {
+    const stateDir = mkdtempSync(`${tmpdir()}/tuor-test-`);
+    try {
+      const volumes: VolumeSpec[] = [
+        { guestPath: "/cache", stateDir },
+      ];
+      const result = buildVfsVolumes(volumes);
+      expect(result["/cache"]).toBeInstanceOf(RealFSProvider);
+    } finally {
+      rmSync(stateDir, { recursive: true });
+    }
+  });
+
+  test("creates state directory if it does not exist", () => {
+    const base = mkdtempSync(`${tmpdir()}/tuor-test-`);
+    try {
+      const stateDir = join(base, "nested", "volume");
+      const volumes: VolumeSpec[] = [
+        { guestPath: "/data", stateDir },
+      ];
+      buildVfsVolumes(volumes);
+      expect(existsSync(stateDir)).toBe(true);
+    } finally {
+      rmSync(base, { recursive: true });
+    }
+  });
+
+  test("returns empty object for empty volumes list", () => {
+    expect(buildVfsVolumes([])).toEqual({});
   });
 });

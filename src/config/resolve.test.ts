@@ -211,6 +211,45 @@ describe("resolveConfig", () => {
     });
   });
 
+  describe("volume resolution", () => {
+    test("resolves absolute guestPath as-is", () => {
+      const spec = resolve({ volumes: [{ guestPath: "/cache" }] });
+      expect(spec.volumes).toEqual([
+        { guestPath: "/cache", stateDir: "/home/user/.tuor/.state/overlays/cache" },
+      ]);
+    });
+
+    test("expands tilde in guestPath using guest home dir", () => {
+      const spec = resolve({
+        user: "bob",
+        volumes: [{ guestPath: "~/data" }],
+      });
+      expect(spec.volumes![0]).toMatchObject({
+        guestPath: "/home/bob/data",
+      });
+    });
+
+    test("computes stateDir using _getOverlayStateDir", () => {
+      const spec = resolve(
+        { volumes: [{ guestPath: "/a/b/c" }] },
+        "/cfg",
+      );
+      expect(spec.volumes![0]!.stateDir).toBe("/cfg/.state/overlays/a_b_c");
+    });
+
+    test("omits volumes when not configured", () => {
+      const spec = resolve({});
+      expect(spec.volumes).toBeUndefined();
+    });
+
+    test("resolves multiple volumes", () => {
+      const spec = resolve({
+        volumes: [{ guestPath: "/cache" }, { guestPath: "/data" }],
+      });
+      expect(spec.volumes).toHaveLength(2);
+    });
+  });
+
   describe("nix integration", () => {
     const nixDeps: NixDeps = {
       hostEnv: {},

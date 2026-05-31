@@ -1,10 +1,10 @@
 import { existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { NetworkSpec, SecretSpec, SessionSpec } from "../core/session.ts";
-import type { MountSpec, MountValidationDeps } from "../core/mounts.ts";
+import type { MountSpec, VolumeSpec, MountValidationDeps } from "../core/mounts.ts";
 import { validateMounts } from "../core/mounts.ts";
 import type { ScopedPattern } from "../core/shadow.ts";
-import type { EnvValue, MountConfig, TuorConfig, WorkdirConfig } from "./schema.ts";
+import type { EnvValue, MountConfig, VolumeConfig, TuorConfig, WorkdirConfig } from "./schema.ts";
 import { expandTilde, inferGuestHomeDir } from "./homedir.ts";
 import {
   parseIgnoreFileRef,
@@ -60,7 +60,12 @@ export function resolveConfig(
 
   const allMounts = [...(nixSetup?.mounts ?? []), ...userMounts];
 
-  validateMounts(allMounts, deps.mountValidation);
+  // Resolve volumes
+  const volumes = (config.volumes ?? []).map((v) =>
+    resolveVolumeConfig(v, configDir, guestHomeDir),
+  );
+
+  validateMounts(allMounts, volumes, deps.mountValidation);
 
   // Resolve env: user env wins over nix env
   const nixEnv = nixSetup?.env ?? {};
@@ -78,6 +83,7 @@ export function resolveConfig(
     workdir: guestWorkdir,
     network,
     mounts: allMounts,
+    ...(volumes.length > 0 ? { volumes } : {}),
     ...(config.rootfsSize ? { rootfsSize: config.rootfsSize } : {}),
     ...(hasEnv ? { env: mergedEnv } : {}),
     ...(hasSecrets ? { secrets } : {}),
@@ -195,6 +201,18 @@ function resolveNetwork(network: TuorConfig["network"]): NetworkSpec {
       allowedInternalHosts: network.allowedInternalHosts ?? [],
     };
   }
+}
+
+function resolveVolumeConfig(
+  v: VolumeConfig,
+  configDir: string,
+  guestHomeDir: string,
+): VolumeSpec {
+  const guestPath = expandTilde(v.guestPath, guestHomeDir);
+  return {
+    guestPath,
+    stateDir: _getOverlayStateDir(configDir, guestPath),
+  };
 }
 
 /** Compute the on-disk path for a persistent overlay's upper layer. */

@@ -1,5 +1,5 @@
 import { VM, createHttpHooks } from "@earendil-works/gondolin";
-import { buildVfsMounts, type MountSpec } from "./mounts.ts";
+import { buildVfsMounts, buildVfsVolumes, type MountSpec, type VolumeSpec } from "./mounts.ts";
 
 // --- Types ---
 
@@ -18,6 +18,7 @@ export type SessionSpec = {
   workdir: string;
   network: NetworkSpec;
   mounts: MountSpec[];
+  volumes?: VolumeSpec[];
   rootfsSize?: string;
   env?: Record<string, string>;
   secrets?: Record<string, SecretSpec>;
@@ -26,8 +27,14 @@ export type SessionSpec = {
 // --- Public API ---
 
 export async function runSession(spec: SessionSpec): Promise<void> {
-  const vfsMounts =
-    spec.mounts.length > 0 ? buildVfsMounts(spec.mounts) : undefined;
+  const mountProviders =
+    spec.mounts.length > 0 ? buildVfsMounts(spec.mounts) : {};
+  const volumeProviders =
+    spec.volumes && spec.volumes.length > 0
+      ? buildVfsVolumes(spec.volumes)
+      : {};
+  const vfsMounts = { ...mountProviders, ...volumeProviders };
+  const hasVfsMounts = Object.keys(vfsMounts).length > 0;
 
   const { env: placeholderSecretsEnv, ...networkOptions } =
     buildNetworkOptions(spec.network, spec.secrets);
@@ -40,7 +47,7 @@ export async function runSession(spec: SessionSpec): Promise<void> {
     ...networkOptions,
     ...(spec.rootfsSize ? { rootfs: { size: spec.rootfsSize } } : {}),
     ...(hasEnv ? { env: mergedEnv } : {}),
-    ...(vfsMounts ? { vfs: { mounts: vfsMounts } } : {}),
+    ...(hasVfsMounts ? { vfs: { mounts: vfsMounts } } : {}),
   });
 
   // `su myuser` gives us an interactive non-login shell (`su - myuser` would

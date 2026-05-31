@@ -18,6 +18,10 @@ const types = scope({
    *   VM shutdown)
    */
   MountMode: "'readwrite' | 'readonly' | 'overlay' | 'overlay-tmpfs'",
+  VolumeConfig: {
+    "+": "reject",
+    guestPath: "AbsolutePath | TildePath",
+  },
   MountConfig: {
     "+": "reject",
     /** Absolute path or path relative to directory containing config file */
@@ -121,6 +125,7 @@ const types = scope({
     /** Environment variables to set in the guest. */
     "env?": { "[string]": "EnvValue" },
     "mounts?": "MountConfig[]",
+    "volumes?": "VolumeConfig[]",
     "workdir": "WorkdirConfig = '/'",
     /**
      * Override the assumed guest user home directory (used for ~ expansion
@@ -136,6 +141,7 @@ const types = scope({
   },
 }).export();
 
+export type VolumeConfig = typeof types.VolumeConfig.infer;
 export type MountConfig = typeof types.MountConfig.infer;
 export type NixConfig = typeof types.NixConfig.infer;
 export type NetworkConfig = typeof types.NetworkConfig.infer;

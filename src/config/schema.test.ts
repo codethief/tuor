@@ -242,6 +242,34 @@ describe("parseConfig", () => {
     });
   });
 
+  describe("volumes config", () => {
+    test("accepts volumes with absolute guestPath", () => {
+      const config = parseConfig({
+        volumes: [{ guestPath: "/cache" }],
+      });
+      expect(config.volumes).toEqual([{ guestPath: "/cache" }]);
+    });
+
+    test("accepts volumes with tilde guestPath", () => {
+      const config = parseConfig({
+        volumes: [{ guestPath: "~/data" }],
+      });
+      expect(config.volumes![0]!.guestPath).toBe("~/data");
+    });
+
+    test("omits volumes when not specified", () => {
+      const config = parseConfig({});
+      expect(config.volumes).toBeUndefined();
+    });
+
+    test("accepts multiple volumes", () => {
+      const config = parseConfig({
+        volumes: [{ guestPath: "/cache" }, { guestPath: "/data" }],
+      });
+      expect(config.volumes).toHaveLength(2);
+    });
+  });
+
   test.each([
     ["relative guestPath", { mounts: [{ hostPath: "/foo", guestPath: "rel" }] }],
     ["empty hostPath", { mounts: [{ hostPath: "" }] }],
@@ -250,6 +278,8 @@ describe("parseConfig", () => {
     ["relative workdir string", { workdir: "relative" }],
     ["empty workdir string", { workdir: "" }],
     ["relative nix profile", { nix: { profiles: ["relative/path"] } }],
+    ["volume with relative guestPath", { volumes: [{ guestPath: "relative" }] }],
+    ["volume with unknown field", { volumes: [{ guestPath: "/x", hostPath: "/y" }] }],
     ["non-object input", "not an object"],
     ["empty ignore array", { mounts: [{ hostPath: "/x", ignore: [] }] }],
     ["env with fromHost: number", { env: { X: { fromHost: 123 } } }],

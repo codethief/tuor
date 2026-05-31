@@ -13,6 +13,13 @@ import { buildShadowPredicate, type ScopedPattern } from "./shadow.ts";
 
 export type MountMode = "readwrite" | "readonly" | "overlay" | "overlay-tmpfs";
 
+/** A volume: a persistent guest directory without a host backing directory. */
+export type VolumeSpec = {
+  guestPath: string;
+  /** On-host directory where the volume's data is stored. */
+  stateDir: string;
+};
+
 /** Core's input contract for a single mount — fully resolved, no optionals. */
 export type MountSpec = {
   hostPath: string;
@@ -30,6 +37,7 @@ export type MountValidationDeps = {
 
 export function validateMounts(
   mounts: MountSpec[],
+  volumes: VolumeSpec[],
   deps: MountValidationDeps,
 ): void {
   for (const mount of mounts) {
@@ -44,15 +52,31 @@ export function validateMounts(
     }
   }
 
+  // Check for duplicate guestPaths across mounts and volumes
+  const allGuestPaths = [
+    ...mounts.map((m) => m.guestPath),
+    ...volumes.map((v) => v.guestPath),
+  ];
   const seen = new Set<string>();
-  for (const mount of mounts) {
-    if (seen.has(mount.guestPath)) {
+  for (const guestPath of allGuestPaths) {
+    if (seen.has(guestPath)) {
       // TODO The check for equality is not enough. We should actually check
       // that the different guestPaths don't contain each other.
-      throw new Error(`Duplicate guest mount path: ${mount.guestPath}`);
+      throw new Error(`Duplicate guest mount path: ${guestPath}`);
     }
-    seen.add(mount.guestPath);
+    seen.add(guestPath);
   }
+}
+
+export function buildVfsVolumes(
+  volumes: VolumeSpec[],
+): Record<string, VirtualProvider> {
+  const result: Record<string, VirtualProvider> = {};
+  for (const vol of volumes) {
+    mkdirSync(vol.stateDir, { recursive: true });
+    result[vol.guestPath] = new RealFSProvider(vol.stateDir);
+  }
+  return result;
 }
 
 export function buildVfsMounts(
