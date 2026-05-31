@@ -1,33 +1,22 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
-import { parseConfig } from "./config/schema.ts";
-import { findAllConfigDirs, mergeConfigs } from "./config/merge.ts";
-import { resolveConfig } from "./config/resolve.ts";
-import { runSession } from "./core/session.ts";
+import { buildApplication, buildRouteMap, run } from "@stricli/core";
+import { command as init } from "./cli/init.ts";
+import { command as run_ } from "./cli/run.ts";
 
-const configDirs = findAllConfigDirs(process.cwd(), homedir());
-if (configDirs.length === 0) {
-  console.error(
-    "No .tuor/config.json found in current directory, any parent, or ~/.config/tuor/.",
-  );
-  process.exit(1);
-}
+const root = buildRouteMap({
+  routes: { init, run: run_ },
+  docs: { brief: "CLI for sandboxing coding agents and other dev tools" },
+});
 
-for (const dir of configDirs) {
-  console.log(`Loading config: ${join(dir, "config.json")}`);
-}
+const app = buildApplication(root, {
+  name: "tuor",
+  scanner: {
+    caseStyle: "allow-kebab-for-camel",
+    allowArgumentEscapeSequence: true,
+  },
+  documentation: {
+    caseStyle: "convert-camel-to-kebab",
+  },
+});
 
-const layers = configDirs.map((dir) => ({
-  config: parseConfig(JSON.parse(readFileSync(join(dir, "config.json"), "utf-8"))),
-  configDir: dir,
-}));
-const config = mergeConfigs(layers);
-const closestConfigDir = configDirs[configDirs.length - 1]!;
-const spec = resolveConfig(config, closestConfigDir, homedir());
-
-const dashDash = process.argv.indexOf("--");
-const command = dashDash >= 0 ? process.argv.slice(dashDash + 1) : undefined;
-
-await runSession(spec, command);
+await run(app, process.argv.slice(2), { process });

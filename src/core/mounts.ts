@@ -11,7 +11,8 @@ import { buildShadowPredicate, type ScopedPattern } from "./shadow.ts";
 
 // --- Types ---
 
-export type MountMode = "readwrite" | "readonly" | "overlay" | "overlay-tmpfs";
+export const MOUNT_MODES = ["readwrite", "readonly", "overlay", "overlay-tmpfs"] as const;
+export type MountMode = (typeof MOUNT_MODES)[number];
 
 /** A volume: a persistent guest directory without a host backing directory. */
 export type VolumeSpec = {
