@@ -76,7 +76,6 @@ export function resolveConfig(
     mounts: allMounts,
     ...(config.rootfsSize ? { rootfsSize: config.rootfsSize } : {}),
     ...(hasEnv ? { env: mergedEnv } : {}),
-    ...(nixSetup ? { bootCommands: [nixSetup.tlsSetupCommand] } : {}),
   };
 }
 

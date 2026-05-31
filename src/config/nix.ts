@@ -7,7 +7,6 @@ import type { MountSpec } from "../core/mounts.ts";
 type NixSetup = {
   mounts: MountSpec[];
   env: Record<string, string>;
-  tlsSetupCommand: string;
 };
 
 export type NixDeps = {
@@ -41,18 +40,13 @@ export function resolveNixSetup(
   return {
     mounts: buildMounts(config, deps),
     env: buildEnv(profiles, deps.hostEnv, deps.realpath, deps.warn),
-    tlsSetupCommand: TLS_SETUP_COMMAND,
   };
 }
 
 // --- Internals ---
 
-const COMBINED_CA_BUNDLE = "/run/gondolin/nix-ca-bundle.crt";
-
-const TLS_SETUP_COMMAND = [
-  "cat /etc/ssl/certs/ca-certificates.crt /etc/gondolin/mitm/ca.crt",
-  `> ${COMBINED_CA_BUNDLE}`,
-].join(" ");
+/** Gondolin's init script merges system + MITM CAs into this bundle. */
+const GONDOLIN_CA_BUNDLE = "/run/gondolin/ca-certificates.crt";
 
 /**
  * Env vars to forward from the host, resolved through symlinks so they point
@@ -116,7 +110,7 @@ function buildEnv(
 
   const env: Record<string, string> = {
     PATH: pathEntries.join(":"),
-    NIX_SSL_CERT_FILE: COMBINED_CA_BUNDLE,
+    NIX_SSL_CERT_FILE: GONDOLIN_CA_BUNDLE,
   };
 
   for (const { key, kind } of FORWARDED_ENV_VARS) {

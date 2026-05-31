@@ -126,7 +126,7 @@ describe("resolveNixSetup", () => {
   describe("env vars", () => {
     test("always sets NIX_SSL_CERT_FILE", () => {
       const { env } = resolveNixSetup({ nixLd: false }, deps());
-      expect(env.NIX_SSL_CERT_FILE).toBe("/run/gondolin/nix-ca-bundle.crt");
+      expect(env.NIX_SSL_CERT_FILE).toBe("/run/gondolin/ca-certificates.crt");
     });
 
     test("resolves NIX_LD_LIBRARY_PATH entries through symlinks", () => {
@@ -287,11 +287,9 @@ describe("resolveNixSetup", () => {
   });
 
   describe("TLS setup", () => {
-    test("produces command that concatenates CA bundles", () => {
-      const { tlsSetupCommand } = resolveNixSetup({ nixLd: false }, deps());
-      expect(tlsSetupCommand).toContain("ca-certificates.crt");
-      expect(tlsSetupCommand).toContain("mitm/ca.crt");
-      expect(tlsSetupCommand).toContain("/run/gondolin/nix-ca-bundle.crt");
+    test("sets NIX_SSL_CERT_FILE to Gondolin's CA bundle", () => {
+      const { env } = resolveNixSetup({ nixLd: false }, deps());
+      expect(env.NIX_SSL_CERT_FILE).toBe("/run/gondolin/ca-certificates.crt");
     });
   });
 });

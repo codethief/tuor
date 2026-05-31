@@ -244,20 +244,9 @@ describe("resolveConfig", () => {
       expect(spec.env!.PATH).toContain("/nix/store/abc/bin");
     });
 
-    test("sets bootCommands from nix", () => {
-      const spec = resolve(
-        { nix: { nixLd: false } },
-        "/cfg",
-        { ...validDeps, nix: nixDeps },
-      );
-      expect(spec.bootCommands).toHaveLength(1);
-      expect(spec.bootCommands![0]).toContain("ca-certificates");
-    });
-
-    test("omits env and bootCommands when nix not configured", () => {
+    test("omits env when nix not configured", () => {
       const spec = resolve({});
       expect(spec.env).toBeUndefined();
-      expect(spec.bootCommands).toBeUndefined();
     });
   });
 

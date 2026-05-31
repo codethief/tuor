@@ -10,7 +10,6 @@ export type SessionSpec = {
   mounts: MountSpec[];
   rootfsSize?: string;
   env?: Record<string, string>;
-  bootCommands?: string[];
 };
 
 // --- Public API ---
@@ -25,10 +24,6 @@ export async function runSession(spec: SessionSpec): Promise<void> {
     ...(spec.env ? { env: spec.env } : {}),
     ...(vfsMounts ? { vfs: { mounts: vfsMounts } } : {}),
   });
-
-  for (const cmd of spec.bootCommands ?? []) {
-    await vm.exec(cmd);
-  }
 
   // `su myuser` gives us an interactive non-login shell (`su - myuser` would
   // give us a login shell but would also cd into the user's home dir, messing
