@@ -50,7 +50,7 @@ host-side mounts on top. Example config:
     {
       "hostPath": "/path/on/the/host",
       "guestPath": "/path/on/the/guest",
-      "readonly": true,
+      "mode": "overlay",  // Will store changes in .tuor/.state/overlays/
       "ignore": [".env", "secrets"],  // Optional: explicit paths to hide from the guest
       "ignoreFileRefs": ["host:./tuorignore", "mount:.tuorignore"]  // Optional, shown here with default value
     }
