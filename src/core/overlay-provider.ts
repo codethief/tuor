@@ -175,7 +175,7 @@ export class OverlayProvider
     const lowerEntries = tryReaddirSync(this.lower, p, options);
 
     // tryReaddir returns [] for both "empty dir" and "dir doesn't exist".
-    // When both layers return [], check whether the directory actually exists.    
+    // When both layers return [], check whether the directory actually exists.
     if (upperEntries.length === 0 && lowerEntries.length === 0) {
       const exists = existsInSync(this.upper, p) || existsInSync(this.lower, p);
       if (!exists) throw enoent("readdir", p);

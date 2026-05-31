@@ -1,0 +1,104 @@
+import { mkdirSync } from "node:fs";
+import {
+  RealFSProvider,
+  ReadonlyProvider,
+  MemoryProvider,
+  ShadowProvider,
+  type VirtualProvider,
+} from "@earendil-works/gondolin";
+import { OverlayProvider } from "./overlay-provider.ts";
+import { buildShadowPredicate, type ScopedPattern } from "./shadow.ts";
+
+// --- Types ---
+
+type MountMode = "readwrite" | "readonly" | "overlay" | "overlay-tmpfs";
+
+/** Core's input contract for a single mount — fully resolved, no optionals. */
+type MountSpec = {
+  hostPath: string;
+  guestPath: string;
+  mode: MountMode;
+  shadowPatterns: ScopedPattern[];
+  /** Pre-computed path for persistent overlay state. Only for 'overlay' mode. */
+  overlayStateDir?: string;
+};
+
+type MountValidationDeps = {
+  pathExists: (p: string) => boolean;
+  isDirectory: (p: string) => boolean;
+};
+
+// --- Validation ---
+
+function validateMounts(
+  mounts: MountSpec[],
+  deps: MountValidationDeps,
+): void {
+  for (const mount of mounts) {
+    if (!deps.pathExists(mount.hostPath)) {
+      throw new Error(`Mount host path does not exist: ${mount.hostPath}`);
+    }
+    if (!deps.isDirectory(mount.hostPath)) {
+      throw new Error(
+        `Mount host path is not a directory: ${mount.hostPath}. ` +
+          "Gondolin's RealFSProvider only supports directories.",
+      );
+    }
+  }
+
+  const seen = new Set<string>();
+  for (const mount of mounts) {
+    if (seen.has(mount.guestPath)) {
+      // TODO The check for equality is not enough. We should actually check
+      // that the different guestPaths don't contain each other.
+      throw new Error(`Duplicate guest mount path: ${mount.guestPath}`);
+    }
+    seen.add(mount.guestPath);
+  }
+}
+
+// --- VFS construction ---
+
+function buildVfsMounts(
+  mounts: MountSpec[],
+): Record<string, VirtualProvider> {
+  const result: Record<string, VirtualProvider> = {};
+  for (const mount of mounts) {
+    let backend: VirtualProvider = new RealFSProvider(mount.hostPath);
+
+    if (mount.shadowPatterns.length > 0) {
+      const predicate = buildShadowPredicate(mount.shadowPatterns);
+      backend = new ShadowProvider(backend, { shouldShadow: predicate, writeMode: "deny" });
+    }
+
+    switch (mount.mode) {
+      case "readwrite":
+        result[mount.guestPath] = backend;
+        break;
+      case "readonly":
+        result[mount.guestPath] = new ReadonlyProvider(backend);
+        break;
+      case "overlay-tmpfs":
+        result[mount.guestPath] = new OverlayProvider(backend, new MemoryProvider());
+        break;
+      case "overlay": {
+        const stateDir = mount.overlayStateDir;
+        if (!stateDir) {
+          throw new Error(
+            `Overlay mount for ${mount.guestPath} is missing overlayStateDir`,
+          );
+        }
+        mkdirSync(stateDir, { recursive: true });
+        result[mount.guestPath] = new OverlayProvider(
+          backend,
+          new RealFSProvider(stateDir),
+        );
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+export { validateMounts, buildVfsMounts };
+export type { MountMode, MountSpec, MountValidationDeps };

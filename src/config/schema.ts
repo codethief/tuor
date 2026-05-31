@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { scope, type } from "arktype";
+import type { MountMode as CoreMountMode } from "../core/mounts.ts";
 
 // --- Schema (single source of truth for validation + types) ---
 
@@ -88,7 +89,15 @@ const types = scope({
   },
 }).export();
 
-type MountMode = typeof types.MountMode.infer;
+// Type-level assertion: arktype's MountMode must match core's MountMode
+type _SchemaMountMode = typeof types.MountMode.infer;
+const _assertMountModeCompat: _SchemaMountMode extends CoreMountMode
+  ? CoreMountMode extends _SchemaMountMode
+    ? true
+    : never
+  : never = true;
+void _assertMountModeCompat;
+
 type MountConfig = typeof types.MountConfig.infer;
 type NixConfig = typeof types.NixConfig.infer;
 type WorkdirConfig = typeof types.WorkdirConfig.infer;
@@ -96,7 +105,6 @@ type TuorConfig = typeof types.TuorConfig.infer;
 
 export type {
   MountConfig,
-  MountMode,
   NixConfig,
   TuorConfig,
   WorkdirConfig,

@@ -58,6 +58,13 @@ describe("resolveNixSetup", () => {
       );
     });
 
+    test("nix mounts have empty shadowPatterns", () => {
+      const { mounts } = resolveNixSetup({ nixLd: true }, deps());
+      for (const mount of mounts) {
+        expect(mount.shadowPatterns).toEqual([]);
+      }
+    });
+
     test("throws when nixLd is true but /lib64 does not exist", () => {
       expect(() =>
         resolveNixSetup(

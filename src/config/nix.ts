@@ -1,11 +1,11 @@
 import { existsSync, realpathSync } from "node:fs";
-import type { NixConfig } from "./config.ts";
-import type { ResolvedMount } from "./mounts.ts";
+import type { NixConfig } from "./schema.ts";
+import type { MountSpec } from "../core/mounts.ts";
 
 // --- Types ---
 
 type NixSetup = {
-  mounts: ResolvedMount[];
+  mounts: MountSpec[];
   env: Record<string, string>;
   tlsSetupCommand: string;
 };
@@ -79,9 +79,9 @@ function resolveExplicitProfiles(
   });
 }
 
-function buildMounts(config: NixConfig, deps: NixDeps): ResolvedMount[] {
-  const mounts: ResolvedMount[] = [
-    { hostPath: "/nix", guestPath: "/nix", mode: "readonly", ignoreFileRefs: [] },
+function buildMounts(config: NixConfig, deps: NixDeps): MountSpec[] {
+  const mounts: MountSpec[] = [
+    { hostPath: "/nix", guestPath: "/nix", mode: "readonly", shadowPatterns: [] },
   ];
 
   if (config.nixLd) {
@@ -91,7 +91,7 @@ function buildMounts(config: NixConfig, deps: NixDeps): ResolvedMount[] {
           "Is nix-ld installed?",
       );
     }
-    mounts.push({ hostPath: "/lib64", guestPath: "/lib64", mode: "readonly", ignoreFileRefs: [] });
+    mounts.push({ hostPath: "/lib64", guestPath: "/lib64", mode: "readonly", shadowPatterns: [] });
   }
 
   return mounts;

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { findConfigDir, parseConfig } from "./config.ts";
+import { findConfigDir, parseConfig } from "./schema.ts";
 
 describe("findConfigDir", () => {
   test("returns config dir when config.json exists in start directory", () => {

@@ -2,12 +2,9 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { VM } from "@earendil-works/gondolin";
-import { findConfigDir, parseConfig } from "./config.ts";
-import { inferGuestHomeDir } from "./homedir.ts";
-import { prepareMounts } from "./mounts.ts";
-import { resolveNixSetup } from "./nix.ts";
-import { resolveWorkdir } from "./workdir.ts";
+import { findConfigDir, parseConfig } from "./config/schema.ts";
+import { resolveConfig } from "./config/resolve.ts";
+import { runSession } from "./core/session.ts";
 
 const configDir = findConfigDir(process.cwd());
 if (!configDir) {
@@ -19,38 +16,5 @@ if (!configDir) {
 
 const raw = JSON.parse(readFileSync(join(configDir, "config.json"), "utf-8"));
 const config = parseConfig(raw);
-
-const hostHome = homedir();
-const guestHome = config.guestHomeDir ?? inferGuestHomeDir(config.user);
-
-const nixSetup = config.nix ? resolveNixSetup(config.nix) : undefined;
-const workdir = resolveWorkdir(config.workdir, configDir, hostHome, guestHome);
-
-const allMounts = [
-  ...(nixSetup?.mounts ?? []),
-  ...(config.mounts ?? []),
-  ...(workdir.mount ? [workdir.mount] : []),
-];
-const vfsMounts =
-  allMounts.length > 0 ? prepareMounts(allMounts, configDir, hostHome, guestHome) : undefined;
-
-const vm = await VM.create({
-  dns: { mode: "open" },
-  ...(config.rootfsSize ? { rootfs: { size: config.rootfsSize } } : {}),
-  ...(nixSetup ? { env: nixSetup.env } : {}),
-  ...(vfsMounts ? { vfs: { mounts: vfsMounts } } : {}),
-});
-
-if (nixSetup) {
-  await vm.exec(nixSetup.tlsSetupCommand);
-}
-
-await vm.shell({
-  attach: true,
-  // `su myuser` gives us an interactive non-login shell (`su - myuser` would
-  // give us a login shell but would also cd into the user's home dir, messing
-  // with the cwd we configure below.)
-  command: ["su", config.user],
-  cwd: workdir.guestPath,
-});
-await vm.close();
+const spec = resolveConfig(config, configDir, homedir());
+await runSession(spec);
