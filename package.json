@@ -5,16 +5,22 @@
   "license": "Apache-2.0",
   "type": "module",
   "private": true,
+  "files": ["dist"],
+  "engines": {
+    "node": ">=22"
+  },
   "bin": {
-    "tuor": "src/main.ts"
+    "tuor": "dist/main.js"
   },
   "scripts": {
     "start": "./src/main.ts",
+    "build": "tsdown",
     "test": "vitest run src/",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^22",
+    "tsdown": "^0.21.10",
     "typescript": "^5",
     "vitest": "^3"
   },

@@ -1,3 +1,4 @@
 3rd-party-repos
 node_modules
+dist
 .envrc
