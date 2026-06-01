@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S node --disable-warning=ExperimentalWarning
 import { buildApplication, buildRouteMap, run } from "@stricli/core";
 import { command as init } from "./cli/init.ts";
 import { command as run_ } from "./cli/run.ts";
