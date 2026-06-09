@@ -1,2 +1,6 @@
 [tools]
 node = "23"
+
+[settings]
+lockfile = true
+locked = true
