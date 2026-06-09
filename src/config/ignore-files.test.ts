@@ -1,13 +1,19 @@
-import { describe, expect, test } from "vitest";
-import { mkdtempSync, mkdirSync, symlinkSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, test } from "vitest";
 import {
   _parseIgnoreFile,
-  parseIgnoreFileRef,
   collectIgnorePatterns,
   defaultIgnoreFileDeps,
   type IgnoreFileDeps,
+  parseIgnoreFileRef,
 } from "./ignore-files.ts";
 
 describe("_parseIgnoreFile", () => {
@@ -96,13 +102,17 @@ describe("collectIgnorePatterns", () => {
 
   test("collects root-scoped patterns from host: ref", () => {
     const deps: IgnoreFileDeps = {
-      readFile: (p) =>
-        p === "/config/.tuor/tuorignore" ? ".env\n.git" : "",
+      readFile: (p) => (p === "/config/.tuor/tuorignore" ? ".env\n.git" : ""),
       pathExists: (p) => p === "/config/.tuor/tuorignore",
       walkFiles: () => [],
     };
     const refs = [parseIgnoreFileRef("host:./tuorignore")];
-    const result = collectIgnorePatterns(refs, "/project", "/config/.tuor", deps);
+    const result = collectIgnorePatterns(
+      refs,
+      "/project",
+      "/config/.tuor",
+      deps,
+    );
     expect(result).toEqual([
       { pattern: ".env", scope: "/" },
       { pattern: ".git", scope: "/" },
@@ -111,8 +121,7 @@ describe("collectIgnorePatterns", () => {
 
   test("collects root-scoped patterns from mount: absolute ref", () => {
     const deps: IgnoreFileDeps = {
-      readFile: (p) =>
-        p === "/project/.tuorignore" ? "build\ndist" : "",
+      readFile: (p) => (p === "/project/.tuorignore" ? "build\ndist" : ""),
       pathExists: (p) => p === "/project/.tuorignore",
       walkFiles: () => [],
     };
@@ -172,7 +181,12 @@ describe("collectIgnorePatterns", () => {
       symlinkSync("target", join(root, "link"));
 
       const refs = [parseIgnoreFileRef("mount:.tuorignore")];
-      const result = collectIgnorePatterns(refs, root, "/cfg", defaultIgnoreFileDeps);
+      const result = collectIgnorePatterns(
+        refs,
+        root,
+        "/cfg",
+        defaultIgnoreFileDeps,
+      );
       // Found in both the real dir and via the symlink
       expect(result).toContainEqual({ pattern: "secret", scope: "/target" });
       expect(result).toContainEqual({ pattern: "secret", scope: "/link" });
@@ -189,7 +203,12 @@ describe("collectIgnorePatterns", () => {
 
       const refs = [parseIgnoreFileRef("mount:.tuorignore")];
       // Should not throw (would throw ENOTDIR if it tried to readdir the symlink)
-      const result = collectIgnorePatterns(refs, root, "/cfg", defaultIgnoreFileDeps);
+      const result = collectIgnorePatterns(
+        refs,
+        root,
+        "/cfg",
+        defaultIgnoreFileDeps,
+      );
       expect(result).toEqual([]);
     } finally {
       rmSync(root, { recursive: true });

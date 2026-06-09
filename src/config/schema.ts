@@ -28,7 +28,7 @@ const types = scope({
     hostPath: "string > 0",
     /** If guestPath is not given explicitly, it will be the same path as on the host. */
     "guestPath?": "AbsolutePath | TildePath",
-    "mode": "MountMode = 'readonly'",
+    mode: "MountMode = 'readonly'",
     /**
      * Patterns to hide from the guest. Bare names (e.g. ".env") match at any
      * depth; paths containing "/" are anchored to the mount root. A trailing
@@ -60,7 +60,7 @@ const types = scope({
      */
     "profiles?": "AbsolutePath[]",
     /** Mount /lib64 (read-only) for nix-ld dynamic linker support. */
-    "nixLd": "boolean = false",
+    nixLd: "boolean = false",
   },
   /**
    * Env var sourced from the host environment.
@@ -69,7 +69,7 @@ const types = scope({
    */
   EnvValueFromHost: {
     "+": "reject",
-    "fromHost": "string > 0 | true",
+    fromHost: "string > 0 | true",
   },
   /**
    * Env var injected as a Gondolin secret: the guest sees a placeholder; the
@@ -119,14 +119,14 @@ const types = scope({
      */
     "nix?": "NixConfig",
     /** The user to open the shell under and to make mounted directories available for. */
-    "user": "string > 0 = 'root'",
+    user: "string > 0 = 'root'",
     /** Network egress policy for the VM. Defaults to restricted (block all). */
     "network?": "NetworkConfig",
     /** Environment variables to set in the guest. */
     "env?": { "[string]": "EnvValue" },
     "mounts?": "MountConfig[]",
     "volumes?": "VolumeConfig[]",
-    "workdir": "WorkdirConfig = '/'",
+    workdir: "WorkdirConfig = '/'",
     /**
      * Override the assumed guest user home directory (used for ~ expansion
      * in guestPaths). Defaults to /root for root, /home/$user otherwise.

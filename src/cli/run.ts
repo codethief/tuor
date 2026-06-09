@@ -39,7 +39,10 @@ export const command = buildCommand({
     customUsage: [
       { input: "", brief: "Start an interactive shell" },
       { input: "-- npm install", brief: "Run a command in the VM" },
-      { input: "--dangerously-open-network", brief: "Run with unrestricted network" },
+      {
+        input: "--dangerously-open-network",
+        brief: "Run with unrestricted network",
+      },
     ],
   },
 });

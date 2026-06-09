@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildCommand, type CommandContext } from "@stricli/core";
-import { MOUNT_MODES, type MountMode } from "../core/mounts.ts";
 import type { TuorConfig } from "../config/schema.ts";
+import { MOUNT_MODES, type MountMode } from "../core/mounts.ts";
 
 type Flags = {
   readonly openNetwork?: boolean;
@@ -24,13 +24,15 @@ export const command = buildCommand({
     mkdirSync(tuorDir, { recursive: true });
 
     const config: TuorConfig = {
-      network: flags.openNetwork ? {
-        mode: "open",
-      } : {
-        "mode": "restricted",
-        "allowedHosts": [],
-        "allowedInternalHosts": [],
-      },
+      network: flags.openNetwork
+        ? {
+            mode: "open",
+          }
+        : {
+            mode: "restricted",
+            allowedHosts: [],
+            allowedInternalHosts: [],
+          },
       user: "root",
       workdir: {
         hostPath: "..",
@@ -79,9 +81,15 @@ export const command = buildCommand({
   docs: {
     brief: "Initialize a .tuor/ directory with a default configuration",
     customUsage: [
-      { input: "", brief: "Initialize with defaults (overlay, restricted network)" },
+      {
+        input: "",
+        brief: "Initialize with defaults (overlay, restricted network)",
+      },
       { input: "--open-network", brief: "Initialize with open network" },
-      { input: "--workspace-mode readwrite", brief: "Initialize with read-write workspace" },
+      {
+        input: "--workspace-mode readwrite",
+        brief: "Initialize with read-write workspace",
+      },
     ],
   },
 });

@@ -1,19 +1,29 @@
 import { existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import type { NetworkSpec, SecretSpec, SessionSpec } from "../core/session.ts";
-import type { MountSpec, VolumeSpec, MountValidationDeps } from "../core/mounts.ts";
+import type {
+  MountSpec,
+  MountValidationDeps,
+  VolumeSpec,
+} from "../core/mounts.ts";
 import { validateMounts } from "../core/mounts.ts";
+import type { NetworkSpec, SecretSpec, SessionSpec } from "../core/session.ts";
 import type { ScopedPattern } from "../core/shadow.ts";
-import type { EnvValue, MountConfig, VolumeConfig, TuorConfig, WorkdirConfig } from "./schema.ts";
 import { expandTilde, inferGuestHomeDir } from "./homedir.ts";
 import {
-  DEFAULT_IGNORE_FILE_REFS,
-  parseIgnoreFileRef,
   collectIgnorePatterns,
+  DEFAULT_IGNORE_FILE_REFS,
   defaultIgnoreFileDeps,
   type IgnoreFileDeps,
+  parseIgnoreFileRef,
 } from "./ignore-files.ts";
-import { resolveNixSetup, type NixDeps } from "./nix.ts";
+import { type NixDeps, resolveNixSetup } from "./nix.ts";
+import type {
+  EnvValue,
+  MountConfig,
+  TuorConfig,
+  VolumeConfig,
+  WorkdirConfig,
+} from "./schema.ts";
 
 // --- Types ---
 
@@ -51,7 +61,13 @@ export function resolveConfig(
 
   // Resolve each mount config into a MountSpec
   const userMounts = mountConfigs.map((m) =>
-    resolveMountConfig(m, configDir, hostHomeDir, guestHomeDir, deps.ignoreFile),
+    resolveMountConfig(
+      m,
+      configDir,
+      hostHomeDir,
+      guestHomeDir,
+      deps.ignoreFile,
+    ),
   );
 
   // Resolve nix
@@ -113,7 +129,12 @@ function resolveMountConfig(
   // Collect shadow patterns from ignore list + ignore file refs
   const ignoreFileRefs = m.ignoreFileRefs ?? DEFAULT_IGNORE_FILE_REFS;
   const refs = ignoreFileRefs.map(parseIgnoreFileRef);
-  const filePatterns = collectIgnorePatterns(refs, hostPath, configDir, ignoreFileDeps);
+  const filePatterns = collectIgnorePatterns(
+    refs,
+    hostPath,
+    configDir,
+    ignoreFileDeps,
+  );
   const inlinePatterns: ScopedPattern[] = (m.ignore ?? []).map((pattern) => ({
     pattern,
     scope: "/",
@@ -176,7 +197,10 @@ function resolveWorkdir(
   if (typeof workdir === "string") {
     return { guestWorkdir: expandTilde(workdir, guestHomeDir) };
   }
-  const resolvedHostPath = resolve(configDir, expandTilde(workdir.hostPath, hostHomeDir));
+  const resolvedHostPath = resolve(
+    configDir,
+    expandTilde(workdir.hostPath, hostHomeDir),
+  );
   // See comment in resolveMountConfig: omitted guestPath intentionally uses the
   // expanded host path so that host and guest paths stay identical.
   const guestWorkdir = workdir.guestPath
@@ -190,7 +214,7 @@ function resolveWorkdir(
 
 function resolveNetwork(network: TuorConfig["network"]): NetworkSpec {
   if (!network) {
-    return { mode: "restricted", allowedHosts: [], allowedInternalHosts: [] }
+    return { mode: "restricted", allowedHosts: [], allowedInternalHosts: [] };
   } else if (network.mode === "open") {
     return network;
   } else {
@@ -215,7 +239,10 @@ function resolveVolumeConfig(
 }
 
 /** Compute the on-disk path for a persistent overlay's upper layer. */
-export function _getOverlayStateDir(configDir: string, guestPath: string): string {
+export function _getOverlayStateDir(
+  configDir: string,
+  guestPath: string,
+): string {
   const stripped = guestPath.replace(/^\//, "");
   const sanitized = stripped === "" ? "_root" : stripped.replace(/\//g, "_");
   return join(configDir, ".state", "overlays", sanitized);
@@ -232,5 +259,3 @@ const defaultResolveDeps: ResolveDeps = {
   hostEnv: process.env,
   warn: (message) => console.warn(`[env] ${message}`),
 };
-
-

@@ -1,8 +1,8 @@
 import { mkdirSync } from "node:fs";
 import {
-  RealFSProvider,
-  ReadonlyProvider,
   MemoryProvider,
+  ReadonlyProvider,
+  RealFSProvider,
   ShadowProvider,
   type VirtualProvider,
 } from "@earendil-works/gondolin";
@@ -11,7 +11,12 @@ import { buildShadowPredicate, type ScopedPattern } from "./shadow.ts";
 
 // --- Types ---
 
-export const MOUNT_MODES = ["readwrite", "readonly", "overlay", "overlay-tmpfs"] as const;
+export const MOUNT_MODES = [
+  "readwrite",
+  "readonly",
+  "overlay",
+  "overlay-tmpfs",
+] as const;
 export type MountMode = (typeof MOUNT_MODES)[number];
 
 /** A volume: a persistent guest directory without a host backing directory. */
@@ -89,7 +94,10 @@ export function buildVfsMounts(
 
     if (mount.shadowPatterns.length > 0) {
       const predicate = buildShadowPredicate(mount.shadowPatterns);
-      backend = new ShadowProvider(backend, { shouldShadow: predicate, writeMode: "deny" });
+      backend = new ShadowProvider(backend, {
+        shouldShadow: predicate,
+        writeMode: "deny",
+      });
     }
 
     switch (mount.mode) {
@@ -100,7 +108,10 @@ export function buildVfsMounts(
         result[mount.guestPath] = new ReadonlyProvider(backend);
         break;
       case "overlay-tmpfs":
-        result[mount.guestPath] = new OverlayProvider(backend, new MemoryProvider());
+        result[mount.guestPath] = new OverlayProvider(
+          backend,
+          new MemoryProvider(),
+        );
         break;
       case "overlay": {
         const stateDir = mount.overlayStateDir;
@@ -120,5 +131,3 @@ export function buildVfsMounts(
   }
   return result;
 }
-
-

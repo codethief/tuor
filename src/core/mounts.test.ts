@@ -1,20 +1,16 @@
-import { describe, expect, test } from "vitest";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ReadonlyProvider, RealFSProvider } from "@earendil-works/gondolin";
+import { describe, expect, test } from "vitest";
 import {
-  validateMounts,
   buildVfsMounts,
   buildVfsVolumes,
   type MountSpec,
-  type VolumeSpec,
   type MountValidationDeps,
+  type VolumeSpec,
+  validateMounts,
 } from "./mounts.ts";
-import {
-  RealFSProvider,
-  ReadonlyProvider,
-  ShadowProvider,
-} from "@earendil-works/gondolin";
 import { OverlayProvider } from "./overlay-provider.ts";
 
 describe("validateMounts", () => {
@@ -25,7 +21,12 @@ describe("validateMounts", () => {
 
   test("passes for existing directories", () => {
     const mounts: MountSpec[] = [
-      { hostPath: "/opt/data", guestPath: "/data", mode: "readwrite", shadowPatterns: [] },
+      {
+        hostPath: "/opt/data",
+        guestPath: "/data",
+        mode: "readwrite",
+        shadowPatterns: [],
+      },
     ];
     expect(() => validateMounts(mounts, [], validDeps)).not.toThrow();
   });
@@ -36,7 +37,12 @@ describe("validateMounts", () => {
       isDirectory: () => true,
     };
     const mounts: MountSpec[] = [
-      { hostPath: "/nonexistent", guestPath: "/data", mode: "readwrite", shadowPatterns: [] },
+      {
+        hostPath: "/nonexistent",
+        guestPath: "/data",
+        mode: "readwrite",
+        shadowPatterns: [],
+      },
     ];
     expect(() => validateMounts(mounts, [], deps)).toThrow(
       "Mount host path does not exist: /nonexistent",
@@ -49,7 +55,12 @@ describe("validateMounts", () => {
       isDirectory: () => false,
     };
     const mounts: MountSpec[] = [
-      { hostPath: "/some/file.txt", guestPath: "/data", mode: "readwrite", shadowPatterns: [] },
+      {
+        hostPath: "/some/file.txt",
+        guestPath: "/data",
+        mode: "readwrite",
+        shadowPatterns: [],
+      },
     ];
     expect(() => validateMounts(mounts, [], deps)).toThrow(
       "Mount host path is not a directory: /some/file.txt",
@@ -58,8 +69,18 @@ describe("validateMounts", () => {
 
   test("throws on duplicate guestPaths", () => {
     const mounts: MountSpec[] = [
-      { hostPath: "/a", guestPath: "/data", mode: "readwrite", shadowPatterns: [] },
-      { hostPath: "/b", guestPath: "/data", mode: "readwrite", shadowPatterns: [] },
+      {
+        hostPath: "/a",
+        guestPath: "/data",
+        mode: "readwrite",
+        shadowPatterns: [],
+      },
+      {
+        hostPath: "/b",
+        guestPath: "/data",
+        mode: "readwrite",
+        shadowPatterns: [],
+      },
     ];
     expect(() => validateMounts(mounts, [], validDeps)).toThrow(
       "Duplicate guest mount path: /data",
@@ -70,7 +91,12 @@ describe("validateMounts", () => {
 describe("buildVfsMounts", () => {
   test("readwrite mode creates RealFSProvider", () => {
     const mounts: MountSpec[] = [
-      { hostPath: "/tmp", guestPath: "/data", mode: "readwrite", shadowPatterns: [] },
+      {
+        hostPath: "/tmp",
+        guestPath: "/data",
+        mode: "readwrite",
+        shadowPatterns: [],
+      },
     ];
     const result = buildVfsMounts(mounts);
     expect(result["/data"]).toBeInstanceOf(RealFSProvider);
@@ -78,7 +104,12 @@ describe("buildVfsMounts", () => {
 
   test("readonly mode creates ReadonlyProvider", () => {
     const mounts: MountSpec[] = [
-      { hostPath: "/tmp", guestPath: "/data", mode: "readonly", shadowPatterns: [] },
+      {
+        hostPath: "/tmp",
+        guestPath: "/data",
+        mode: "readonly",
+        shadowPatterns: [],
+      },
     ];
     const result = buildVfsMounts(mounts);
     expect(result["/data"]).toBeInstanceOf(ReadonlyProvider);
@@ -86,7 +117,12 @@ describe("buildVfsMounts", () => {
 
   test("overlay-tmpfs mode creates OverlayProvider", () => {
     const mounts: MountSpec[] = [
-      { hostPath: "/tmp", guestPath: "/data", mode: "overlay-tmpfs", shadowPatterns: [] },
+      {
+        hostPath: "/tmp",
+        guestPath: "/data",
+        mode: "overlay-tmpfs",
+        shadowPatterns: [],
+      },
     ];
     const result = buildVfsMounts(mounts);
     expect(result["/data"]).toBeInstanceOf(OverlayProvider);
@@ -124,7 +160,12 @@ describe("buildVfsMounts", () => {
 
   test("no shadow patterns does not wrap with ShadowProvider", () => {
     const mounts: MountSpec[] = [
-      { hostPath: "/tmp", guestPath: "/data", mode: "readwrite", shadowPatterns: [] },
+      {
+        hostPath: "/tmp",
+        guestPath: "/data",
+        mode: "readwrite",
+        shadowPatterns: [],
+      },
     ];
     const result = buildVfsMounts(mounts);
     expect(result["/data"]).toBeInstanceOf(RealFSProvider);
@@ -153,7 +194,12 @@ describe("buildVfsMounts", () => {
 
   test("overlay mode throws when overlayStateDir is missing", () => {
     const mounts: MountSpec[] = [
-      { hostPath: "/tmp", guestPath: "/workspace", mode: "overlay", shadowPatterns: [] },
+      {
+        hostPath: "/tmp",
+        guestPath: "/workspace",
+        mode: "overlay",
+        shadowPatterns: [],
+      },
     ];
     expect(() => buildVfsMounts(mounts)).toThrow(/missing overlayStateDir/);
   });
@@ -167,7 +213,12 @@ describe("validateMounts with volumes", () => {
 
   test("passes when mount and volume guestPaths are distinct", () => {
     const mounts: MountSpec[] = [
-      { hostPath: "/opt/data", guestPath: "/data", mode: "readwrite", shadowPatterns: [] },
+      {
+        hostPath: "/opt/data",
+        guestPath: "/data",
+        mode: "readwrite",
+        shadowPatterns: [],
+      },
     ];
     const volumes: VolumeSpec[] = [
       { guestPath: "/cache", stateDir: "/tmp/state/cache" },
@@ -177,7 +228,12 @@ describe("validateMounts with volumes", () => {
 
   test("throws when volume guestPath collides with mount guestPath", () => {
     const mounts: MountSpec[] = [
-      { hostPath: "/opt/data", guestPath: "/data", mode: "readwrite", shadowPatterns: [] },
+      {
+        hostPath: "/opt/data",
+        guestPath: "/data",
+        mode: "readwrite",
+        shadowPatterns: [],
+      },
     ];
     const volumes: VolumeSpec[] = [
       { guestPath: "/data", stateDir: "/tmp/state/data" },
@@ -202,9 +258,7 @@ describe("buildVfsVolumes", () => {
   test("creates RealFSProvider backed by state directory", () => {
     const stateDir = mkdtempSync(`${tmpdir()}/tuor-test-`);
     try {
-      const volumes: VolumeSpec[] = [
-        { guestPath: "/cache", stateDir },
-      ];
+      const volumes: VolumeSpec[] = [{ guestPath: "/cache", stateDir }];
       const result = buildVfsVolumes(volumes);
       expect(result["/cache"]).toBeInstanceOf(RealFSProvider);
     } finally {
@@ -216,9 +270,7 @@ describe("buildVfsVolumes", () => {
     const base = mkdtempSync(`${tmpdir()}/tuor-test-`);
     try {
       const stateDir = join(base, "nested", "volume");
-      const volumes: VolumeSpec[] = [
-        { guestPath: "/data", stateDir },
-      ];
+      const volumes: VolumeSpec[] = [{ guestPath: "/data", stateDir }];
       buildVfsVolumes(volumes);
       expect(existsSync(stateDir)).toBe(true);
     } finally {

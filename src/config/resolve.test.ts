@@ -1,8 +1,13 @@
 import { describe, expect, test } from "vitest";
-import { resolveConfig, _getOverlayStateDir, _resolveEnv, type ResolveDeps } from "./resolve.ts";
-import type { TuorConfig } from "./schema.ts";
 import type { IgnoreFileDeps } from "./ignore-files.ts";
 import type { NixDeps } from "./nix.ts";
+import {
+  _getOverlayStateDir,
+  _resolveEnv,
+  type ResolveDeps,
+  resolveConfig,
+} from "./resolve.ts";
+import type { TuorConfig } from "./schema.ts";
 
 const noopIgnoreFileDeps: IgnoreFileDeps = {
   readFile: () => "",
@@ -22,7 +27,11 @@ const validDeps: ResolveDeps = {
 
 const HOST_HOME = "/home/hostuser";
 
-function resolve(config: Partial<TuorConfig>, configDir = "/home/user/.tuor", deps = validDeps) {
+function resolve(
+  config: Partial<TuorConfig>,
+  configDir = "/home/user/.tuor",
+  deps = validDeps,
+) {
   const full: TuorConfig = { user: "root", workdir: "/", ...config };
   return resolveConfig(full, configDir, HOST_HOME, deps);
 }
@@ -59,7 +68,9 @@ describe("resolveConfig", () => {
 
     test("uses explicit guestPath as-is", () => {
       const spec = resolve({
-        mounts: [{ hostPath: "/opt/data", guestPath: "/workspace", mode: "readonly" }],
+        mounts: [
+          { hostPath: "/opt/data", guestPath: "/workspace", mode: "readonly" },
+        ],
       });
       expect(spec.mounts[0]!.guestPath).toBe("/workspace");
     });
@@ -87,7 +98,9 @@ describe("resolveConfig", () => {
     test("expands ~ in guestPath using guest home dir", () => {
       const spec = resolve({
         user: "bob",
-        mounts: [{ hostPath: "/opt/data", guestPath: "~/data", mode: "readonly" }],
+        mounts: [
+          { hostPath: "/opt/data", guestPath: "~/data", mode: "readonly" },
+        ],
       });
       expect(spec.mounts[0]!.guestPath).toBe("/home/bob/data");
     });
@@ -103,15 +116,25 @@ describe("resolveConfig", () => {
   describe("shadow patterns", () => {
     test("collects inline ignore patterns as root-scoped", () => {
       const spec = resolve({
-        mounts: [{ hostPath: "/opt/data", mode: "readonly", ignore: [".env", ".git"] }],
+        mounts: [
+          { hostPath: "/opt/data", mode: "readonly", ignore: [".env", ".git"] },
+        ],
       });
-      expect(spec.mounts[0]!.shadowPatterns).toContainEqual({ pattern: ".env", scope: "/" });
-      expect(spec.mounts[0]!.shadowPatterns).toContainEqual({ pattern: ".git", scope: "/" });
+      expect(spec.mounts[0]!.shadowPatterns).toContainEqual({
+        pattern: ".env",
+        scope: "/",
+      });
+      expect(spec.mounts[0]!.shadowPatterns).toContainEqual({
+        pattern: ".git",
+        scope: "/",
+      });
     });
 
     test("has empty shadowPatterns when no ignore config", () => {
       const spec = resolve({
-        mounts: [{ hostPath: "/opt/data", mode: "readonly", ignoreFileRefs: [] }],
+        mounts: [
+          { hostPath: "/opt/data", mode: "readonly", ignoreFileRefs: [] },
+        ],
       });
       expect(spec.mounts[0]!.shadowPatterns).toEqual([]);
     });
@@ -127,19 +150,29 @@ describe("resolveConfig", () => {
         },
       };
       const spec = resolve(
-        { mounts: [{ hostPath: "/opt/data", mode: "readonly", ignoreFileRefs: ["host:./tuorignore"] }] },
+        {
+          mounts: [
+            {
+              hostPath: "/opt/data",
+              mode: "readonly",
+              ignoreFileRefs: ["host:./tuorignore"],
+            },
+          ],
+        },
         "/home/user/.tuor",
         deps,
       );
-      expect(spec.mounts[0]!.shadowPatterns).toContainEqual({ pattern: "secret", scope: "/" });
+      expect(spec.mounts[0]!.shadowPatterns).toContainEqual({
+        pattern: "secret",
+        scope: "/",
+      });
     });
 
     test("uses default ignoreFileRefs when not provided", () => {
       const deps: ResolveDeps = {
         ...validDeps,
         ignoreFile: {
-          readFile: (p) =>
-            p === "/cfg/tuorignore" ? "hidden" : "",
+          readFile: (p) => (p === "/cfg/tuorignore" ? "hidden" : ""),
           pathExists: (p) => p === "/cfg/tuorignore",
           walkFiles: () => [],
         },
@@ -150,7 +183,10 @@ describe("resolveConfig", () => {
         "/cfg",
         deps,
       );
-      expect(spec.mounts[0]!.shadowPatterns).toContainEqual({ pattern: "hidden", scope: "/" });
+      expect(spec.mounts[0]!.shadowPatterns).toContainEqual({
+        pattern: "hidden",
+        scope: "/",
+      });
     });
   });
 
@@ -167,7 +203,11 @@ describe("resolveConfig", () => {
 
     test("uses explicit guestPath from MountConfig workdir", () => {
       const spec = resolve({
-        workdir: { hostPath: "/host/project", guestPath: "/guest/project", mode: "readonly" },
+        workdir: {
+          hostPath: "/host/project",
+          guestPath: "/guest/project",
+          mode: "readonly",
+        },
       });
       expect(spec.workdir).toBe("/guest/project");
     });
@@ -181,7 +221,11 @@ describe("resolveConfig", () => {
 
     test("adds workdir mount to mounts", () => {
       const spec = resolve({
-        workdir: { hostPath: "/host/project", guestPath: "/workspace", mode: "readonly" },
+        workdir: {
+          hostPath: "/host/project",
+          guestPath: "/workspace",
+          mode: "readonly",
+        },
       });
       expect(spec.mounts).toHaveLength(1);
       expect(spec.mounts[0]).toMatchObject({
@@ -205,7 +249,11 @@ describe("resolveConfig", () => {
     test("expands ~ in MountConfig workdir guestPath using guest home dir", () => {
       const spec = resolve({
         user: "bob",
-        workdir: { hostPath: "/host/project", guestPath: "~/project", mode: "readonly" },
+        workdir: {
+          hostPath: "/host/project",
+          guestPath: "~/project",
+          mode: "readonly",
+        },
       });
       expect(spec.workdir).toBe("/home/bob/project");
     });
@@ -215,7 +263,10 @@ describe("resolveConfig", () => {
     test("resolves absolute guestPath as-is", () => {
       const spec = resolve({ volumes: [{ guestPath: "/cache" }] });
       expect(spec.volumes).toEqual([
-        { guestPath: "/cache", stateDir: "/home/user/.tuor/.state/overlays/cache" },
+        {
+          guestPath: "/cache",
+          stateDir: "/home/user/.tuor/.state/overlays/cache",
+        },
       ]);
     });
 
@@ -230,10 +281,7 @@ describe("resolveConfig", () => {
     });
 
     test("computes stateDir using _getOverlayStateDir", () => {
-      const spec = resolve(
-        { volumes: [{ guestPath: "/a/b/c" }] },
-        "/cfg",
-      );
+      const spec = resolve({ volumes: [{ guestPath: "/a/b/c" }] }, "/cfg");
       expect(spec.volumes![0]!.stateDir).toBe("/cfg/.state/overlays/a_b_c");
     });
 
@@ -264,7 +312,9 @@ describe("resolveConfig", () => {
       const spec = resolve(
         {
           nix: { nixLd: false },
-          mounts: [{ hostPath: "/opt/data", guestPath: "/data", mode: "readonly" }],
+          mounts: [
+            { hostPath: "/opt/data", guestPath: "/data", mode: "readonly" },
+          ],
         },
         "/cfg",
         { ...validDeps, nix: nixDeps },
@@ -274,11 +324,10 @@ describe("resolveConfig", () => {
     });
 
     test("sets env from nix", () => {
-      const spec = resolve(
-        { nix: { nixLd: false } },
-        "/cfg",
-        { ...validDeps, nix: nixDeps },
-      );
+      const spec = resolve({ nix: { nixLd: false } }, "/cfg", {
+        ...validDeps,
+        nix: nixDeps,
+      });
       expect(spec.env).toBeDefined();
       expect(spec.env!.PATH).toContain("/nix/store/abc/bin");
     });
@@ -392,10 +441,8 @@ describe("_resolveEnv", () => {
 
   test("warns and skips when host var is missing", () => {
     const warnings: string[] = [];
-    const { env } = _resolveEnv(
-      { SECRET: { fromHost: true } },
-      {},
-      (msg) => warnings.push(msg),
+    const { env } = _resolveEnv({ SECRET: { fromHost: true } }, {}, (msg) =>
+      warnings.push(msg),
     );
     expect(env).toEqual({});
     expect(warnings).toHaveLength(1);
@@ -416,11 +463,19 @@ describe("_resolveEnv", () => {
 
   test("resolves mixed value types", () => {
     const { env } = _resolveEnv(
-      { FIXED: "val", FROM_HOST: { fromHost: true }, RENAMED: { fromHost: "SRC" } },
+      {
+        FIXED: "val",
+        FROM_HOST: { fromHost: true },
+        RENAMED: { fromHost: "SRC" },
+      },
       { FROM_HOST: "hostval", SRC: "srcval" },
       () => {},
     );
-    expect(env).toEqual({ FIXED: "val", FROM_HOST: "hostval", RENAMED: "srcval" });
+    expect(env).toEqual({
+      FIXED: "val",
+      FROM_HOST: "hostval",
+      RENAMED: "srcval",
+    });
   });
 
   test("partitions secrets from regular env vars", () => {
@@ -441,7 +496,13 @@ describe("_resolveEnv", () => {
 
   test("resolves secret with fromHost: string", () => {
     const { secrets } = _resolveEnv(
-      { GH_TOKEN: { secret: true, fromHost: "GITHUB_TOKEN", hosts: ["*.github.com"] } },
+      {
+        GH_TOKEN: {
+          secret: true,
+          fromHost: "GITHUB_TOKEN",
+          hosts: ["*.github.com"],
+        },
+      },
       { GITHUB_TOKEN: "ghp_abc" },
       () => {},
     );
@@ -475,11 +536,10 @@ describe("resolveConfig env integration", () => {
   });
 
   test("passes through user env to SessionSpec", () => {
-    const spec = resolve(
-      { env: { MY_VAR: "hello" } },
-      "/cfg",
-      { ...validDeps, hostEnv: {} },
-    );
+    const spec = resolve({ env: { MY_VAR: "hello" } }, "/cfg", {
+      ...validDeps,
+      hostEnv: {},
+    });
     expect(spec.env).toEqual({ MY_VAR: "hello" });
   });
 
@@ -519,11 +579,10 @@ describe("resolveConfig env integration", () => {
   });
 
   test("resolves fromHost vars using deps.hostEnv", () => {
-    const spec = resolve(
-      { env: { EDITOR: { fromHost: true } } },
-      "/cfg",
-      { ...validDeps, hostEnv: { EDITOR: "vim" } },
-    );
+    const spec = resolve({ env: { EDITOR: { fromHost: true } } }, "/cfg", {
+      ...validDeps,
+      hostEnv: { EDITOR: "vim" },
+    });
     expect(spec.env).toEqual({ EDITOR: "vim" });
   });
 
@@ -545,10 +604,7 @@ describe("resolveConfig env integration", () => {
   });
 
   test("omits secrets when none configured", () => {
-    const spec = resolve(
-      { env: { MY_VAR: "hello" } },
-      "/cfg",
-    );
+    const spec = resolve({ env: { MY_VAR: "hello" } }, "/cfg");
     expect(spec.secrets).toBeUndefined();
   });
 });

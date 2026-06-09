@@ -1,5 +1,10 @@
-import { VM, createHttpHooks } from "@earendil-works/gondolin";
-import { buildVfsMounts, buildVfsVolumes, type MountSpec, type VolumeSpec } from "./mounts.ts";
+import { createHttpHooks, VM } from "@earendil-works/gondolin";
+import {
+  buildVfsMounts,
+  buildVfsVolumes,
+  type MountSpec,
+  type VolumeSpec,
+} from "./mounts.ts";
 
 // --- Types ---
 
@@ -10,7 +15,11 @@ export type SecretSpec = {
 
 export type NetworkSpec =
   | { mode: "open" }
-  | { mode: "restricted"; allowedHosts: string[]; allowedInternalHosts: string[] };
+  | {
+      mode: "restricted";
+      allowedHosts: string[];
+      allowedInternalHosts: string[];
+    };
 
 /** Core's top-level input contract — everything the session needs to run. */
 export type SessionSpec = {
@@ -39,8 +48,10 @@ export async function runSession(
   const vfsMounts = { ...mountProviders, ...volumeProviders };
   const hasVfsMounts = Object.keys(vfsMounts).length > 0;
 
-  const { env: placeholderSecretsEnv, ...networkOptions } =
-    buildNetworkOptions(spec.network, spec.secrets);
+  const { env: placeholderSecretsEnv, ...networkOptions } = buildNetworkOptions(
+    spec.network,
+    spec.secrets,
+  );
 
   // Placeholder env wins over user env so secrets can't be leaked via env config
   const mergedEnv = { ...spec.env, ...placeholderSecretsEnv };
@@ -99,5 +110,3 @@ function buildNetworkOptions(
     }
   }
 }
-
-

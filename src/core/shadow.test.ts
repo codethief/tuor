@@ -90,13 +90,17 @@ describe("buildShadowPredicate", () => {
     });
 
     test("anchored path in sub scope is relative to scope", () => {
-      const patterns: ScopedPattern[] = [{ pattern: "build/out", scope: "/sub" }];
+      const patterns: ScopedPattern[] = [
+        { pattern: "build/out", scope: "/sub" },
+      ];
       expect(matches(patterns, "/sub/build/out")).toBe(true);
       expect(matches(patterns, "/sub/build/out/file.js")).toBe(true);
     });
 
     test("anchored path in sub scope does not match outside scope", () => {
-      const patterns: ScopedPattern[] = [{ pattern: "build/out", scope: "/sub" }];
+      const patterns: ScopedPattern[] = [
+        { pattern: "build/out", scope: "/sub" },
+      ];
       expect(matches(patterns, "/build/out")).toBe(false);
       expect(matches(patterns, "/other/build/out")).toBe(false);
     });

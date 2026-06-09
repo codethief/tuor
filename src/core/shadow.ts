@@ -11,9 +11,10 @@ export type ScopedPattern = { pattern: string; scope: string };
 
 type ShadowPredicate = (ctx: { op: string; path: string }) => boolean;
 
-type CompiledRule = { anchored: string } | { unanchored: string; scope: string };
+type CompiledRule =
+  | { anchored: string }
+  | { unanchored: string; scope: string };
 // `anchored`, `unanchored`, `scope` are paths.
-
 
 // --- Shadow predicate ---
 
@@ -31,14 +32,17 @@ type CompiledRule = { anchored: string } | { unanchored: string; scope: string }
  * In all cases, a match on a path also shadows everything below it
  * (e.g. ".git" shadows ".git/config").
  */
-export function buildShadowPredicate(patterns: ScopedPattern[]): ShadowPredicate {
+export function buildShadowPredicate(
+  patterns: ScopedPattern[],
+): ShadowPredicate {
   const rules: CompiledRule[] = [];
 
   for (const { pattern: rawPattern, scope } of patterns) {
     // Strip trailing slash
-    const pattern = rawPattern.length > 1 && rawPattern.endsWith("/")
-      ? rawPattern.slice(0, -1)
-      : rawPattern;
+    const pattern =
+      rawPattern.length > 1 && rawPattern.endsWith("/")
+        ? rawPattern.slice(0, -1)
+        : rawPattern;
 
     const containsSlash = pattern.includes("/");
     if (!containsSlash) {
@@ -46,8 +50,12 @@ export function buildShadowPredicate(patterns: ScopedPattern[]): ShadowPredicate
     } else {
       // Anchored relative to scope
       const normalizedScope = scope === "/" ? "" : scope;
-      const patternWithoutLeadingSlash = pattern.startsWith("/") ? pattern.slice(1) : pattern;
-      rules.push({ anchored: `${normalizedScope}/${patternWithoutLeadingSlash}` });
+      const patternWithoutLeadingSlash = pattern.startsWith("/")
+        ? pattern.slice(1)
+        : pattern;
+      rules.push({
+        anchored: `${normalizedScope}/${patternWithoutLeadingSlash}`,
+      });
     }
   }
 
@@ -88,7 +96,6 @@ function doesRuleMatch(rule: CompiledRule, path: string) {
     }
   }
 }
-
 
 /**
  * @param path Path to be matched

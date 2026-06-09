@@ -1,13 +1,16 @@
 import { describe, expect, test } from "vitest";
 import {
-  resolveNixSetup,
   _resolveDefaultProfiles,
   type NixDeps,
+  resolveNixSetup,
 } from "./nix.ts";
 
 const baseDeps: NixDeps = {
   hostEnv: {},
-  resolveProfiles: () => ["/nix/store/abc-system-path", "/nix/store/xyz-user-env"],
+  resolveProfiles: () => [
+    "/nix/store/abc-system-path",
+    "/nix/store/xyz-user-env",
+  ],
   realpath: (p) => p,
   nixExists: () => true,
   lib64Exists: () => true,
@@ -68,10 +71,7 @@ describe("resolveNixSetup", () => {
 
     test("throws when nixLd is true but /lib64 does not exist", () => {
       expect(() =>
-        resolveNixSetup(
-          { nixLd: true },
-          deps({ lib64Exists: () => false }),
-        ),
+        resolveNixSetup({ nixLd: true }, deps({ lib64Exists: () => false })),
       ).toThrow("/lib64 does not exist");
     });
   });
@@ -93,9 +93,7 @@ describe("resolveNixSetup", () => {
         { profiles: ["/run/current-system/sw"], nixLd: false },
         deps({
           realpath: (p) =>
-            p === "/run/current-system/sw"
-              ? "/nix/store/abc-system-path"
-              : p,
+            p === "/run/current-system/sw" ? "/nix/store/abc-system-path" : p,
         }),
       );
       expect(env.PATH).toBe("/nix/store/abc-system-path/bin");
@@ -107,7 +105,7 @@ describe("resolveNixSetup", () => {
           { profiles: ["/usr/local/share/myprofile"], nixLd: false },
           deps(),
         ),
-      ).toThrow('not under /nix/');
+      ).toThrow("not under /nix/");
     });
 
     test("auto-detects profiles when not specified", () => {
@@ -117,9 +115,7 @@ describe("resolveNixSetup", () => {
           resolveProfiles: () => ["/nix/store/sys-path", "/nix/store/user-env"],
         }),
       );
-      expect(env.PATH).toBe(
-        "/nix/store/sys-path/bin:/nix/store/user-env/bin",
-      );
+      expect(env.PATH).toBe("/nix/store/sys-path/bin:/nix/store/user-env/bin");
     });
   });
 
@@ -135,9 +131,7 @@ describe("resolveNixSetup", () => {
         deps({
           hostEnv: { NIX_LD_LIBRARY_PATH: "/run/current-system/sw/lib" },
           realpath: (p) =>
-            p === "/run/current-system/sw/lib"
-              ? "/nix/store/abc-libs/lib"
-              : p,
+            p === "/run/current-system/sw/lib" ? "/nix/store/abc-libs/lib" : p,
         }),
       );
       expect(env.NIX_LD_LIBRARY_PATH).toBe("/nix/store/abc-libs/lib");
@@ -148,7 +142,8 @@ describe("resolveNixSetup", () => {
         { nixLd: false },
         deps({
           hostEnv: {
-            NIX_LD_LIBRARY_PATH: "/run/current-system/sw/lib:/run/current-system/sw/lib64",
+            NIX_LD_LIBRARY_PATH:
+              "/run/current-system/sw/lib:/run/current-system/sw/lib64",
           },
           realpath: (p) => {
             const map: Record<string, string> = {
@@ -172,9 +167,7 @@ describe("resolveNixSetup", () => {
             NIX_LD_LIBRARY_PATH: "/usr/lib:/run/current-system/sw/lib",
           },
           realpath: (p) =>
-            p === "/run/current-system/sw/lib"
-              ? "/nix/store/abc/lib"
-              : p,
+            p === "/run/current-system/sw/lib" ? "/nix/store/abc/lib" : p,
         }),
       );
       expect(env.NIX_LD_LIBRARY_PATH).toBe("/nix/store/abc/lib");
@@ -199,14 +192,18 @@ describe("resolveNixSetup", () => {
       const { env } = resolveNixSetup(
         { nixLd: false },
         deps({
-          hostEnv: { LOCALE_ARCHIVE: "/run/current-system/sw/lib/locale/locale-archive" },
+          hostEnv: {
+            LOCALE_ARCHIVE: "/run/current-system/sw/lib/locale/locale-archive",
+          },
           realpath: (p) =>
             p === "/run/current-system/sw/lib/locale/locale-archive"
               ? "/nix/store/abc-glibc/lib/locale/locale-archive"
               : p,
         }),
       );
-      expect(env.LOCALE_ARCHIVE).toBe("/nix/store/abc-glibc/lib/locale/locale-archive");
+      expect(env.LOCALE_ARCHIVE).toBe(
+        "/nix/store/abc-glibc/lib/locale/locale-archive",
+      );
     });
 
     test("drops LOCALE_ARCHIVE when it doesn't resolve under /nix/", () => {

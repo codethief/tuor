@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { findConfigDir, parseConfig } from "./schema.ts";
 
-
 describe("findConfigDir", () => {
   test("returns config dir when config.json exists in start directory", () => {
     const exists = (path: string) => path === "/project/.tuor/config.json";
@@ -111,9 +110,17 @@ describe("parseConfig", () => {
 
   test("accepts explicit ignoreFileRefs", () => {
     const config = parseConfig({
-      mounts: [{ hostPath: "/data", ignoreFileRefs: ["host:custom", "mount:.myignore"] }],
+      mounts: [
+        {
+          hostPath: "/data",
+          ignoreFileRefs: ["host:custom", "mount:.myignore"],
+        },
+      ],
     });
-    expect(config.mounts![0]!.ignoreFileRefs).toEqual(["host:custom", "mount:.myignore"]);
+    expect(config.mounts![0]!.ignoreFileRefs).toEqual([
+      "host:custom",
+      "mount:.myignore",
+    ]);
   });
 
   test("omits ignoreFileRefs when not specified", () => {
@@ -134,13 +141,19 @@ describe("parseConfig", () => {
   });
 
   test("accepts env with fromHost: string", () => {
-    const config = parseConfig({ env: { DB_URL: { fromHost: "DATABASE_URL" } } });
+    const config = parseConfig({
+      env: { DB_URL: { fromHost: "DATABASE_URL" } },
+    });
     expect(config.env).toEqual({ DB_URL: { fromHost: "DATABASE_URL" } });
   });
 
   test("accepts env with mixed value types", () => {
     const config = parseConfig({
-      env: { FIXED: "value", FROM_HOST: { fromHost: true }, RENAMED: { fromHost: "OTHER" } },
+      env: {
+        FIXED: "value",
+        FROM_HOST: { fromHost: true },
+        RENAMED: { fromHost: "OTHER" },
+      },
     });
     expect(config.env).toEqual({
       FIXED: "value",
@@ -151,7 +164,9 @@ describe("parseConfig", () => {
 
   test("accepts env with secret (fromHost: true)", () => {
     const config = parseConfig({
-      env: { API_KEY: { secret: true, fromHost: true, hosts: ["api.example.com"] } },
+      env: {
+        API_KEY: { secret: true, fromHost: true, hosts: ["api.example.com"] },
+      },
     });
     expect(config.env).toEqual({
       API_KEY: { secret: true, fromHost: true, hosts: ["api.example.com"] },
@@ -160,10 +175,20 @@ describe("parseConfig", () => {
 
   test("accepts env with secret (fromHost: string)", () => {
     const config = parseConfig({
-      env: { GH_TOKEN: { secret: true, fromHost: "GITHUB_TOKEN", hosts: ["*.github.com"] } },
+      env: {
+        GH_TOKEN: {
+          secret: true,
+          fromHost: "GITHUB_TOKEN",
+          hosts: ["*.github.com"],
+        },
+      },
     });
     expect(config.env).toEqual({
-      GH_TOKEN: { secret: true, fromHost: "GITHUB_TOKEN", hosts: ["*.github.com"] },
+      GH_TOKEN: {
+        secret: true,
+        fromHost: "GITHUB_TOKEN",
+        hosts: ["*.github.com"],
+      },
     });
   });
 
@@ -195,7 +220,10 @@ describe("parseConfig", () => {
 
     test("accepts restricted mode with allowedHosts", () => {
       const config = parseConfig({
-        network: { mode: "restricted", allowedHosts: ["*.github.com", "api.anthropic.com"] },
+        network: {
+          mode: "restricted",
+          allowedHosts: ["*.github.com", "api.anthropic.com"],
+        },
       });
       expect(config.network).toEqual({
         mode: "restricted",
@@ -271,22 +299,34 @@ describe("parseConfig", () => {
   });
 
   test.each([
-    ["relative guestPath", { mounts: [{ hostPath: "/foo", guestPath: "rel" }] }],
+    [
+      "relative guestPath",
+      { mounts: [{ hostPath: "/foo", guestPath: "rel" }] },
+    ],
     ["empty hostPath", { mounts: [{ hostPath: "" }] }],
     ["invalid mode", { mounts: [{ hostPath: "/x", mode: "bad" }] }],
     ["non-string hostPath", { mounts: [{ hostPath: 123 }] }],
     ["relative workdir string", { workdir: "relative" }],
     ["empty workdir string", { workdir: "" }],
     ["relative nix profile", { nix: { profiles: ["relative/path"] } }],
-    ["volume with relative guestPath", { volumes: [{ guestPath: "relative" }] }],
-    ["volume with unknown field", { volumes: [{ guestPath: "/x", hostPath: "/y" }] }],
+    [
+      "volume with relative guestPath",
+      { volumes: [{ guestPath: "relative" }] },
+    ],
+    [
+      "volume with unknown field",
+      { volumes: [{ guestPath: "/x", hostPath: "/y" }] },
+    ],
     ["non-object input", "not an object"],
     ["empty ignore array", { mounts: [{ hostPath: "/x", ignore: [] }] }],
     ["env with fromHost: number", { env: { X: { fromHost: 123 } } }],
     ["env with fromHost: empty string", { env: { X: { fromHost: "" } } }],
     ["env with unknown source key", { env: { X: { badKey: true } } }],
     ["secret without hosts", { env: { X: { secret: true, fromHost: true } } }],
-    ["secret with empty hosts", { env: { X: { secret: true, fromHost: true, hosts: [] } } }],
+    [
+      "secret with empty hosts",
+      { env: { X: { secret: true, fromHost: true, hosts: [] } } },
+    ],
     ["secret without fromHost", { env: { X: { secret: true, hosts: ["h"] } } }],
   ])("rejects %s", (_label, raw) => {
     expect(() => parseConfig(raw)).toThrow();

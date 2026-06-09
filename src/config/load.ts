@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { SessionSpec } from "../core/session.ts";
-import { parseConfig } from "./schema.ts";
 import { findAllConfigDirs, mergeConfigs } from "./merge.ts";
 import { resolveConfig } from "./resolve.ts";
+import { parseConfig } from "./schema.ts";
 
 export type LoadedConfig = {
   spec: SessionSpec;
@@ -29,7 +29,9 @@ export function loadConfig(): LoadedConfig {
   }
 
   const layers = configDirs.map((dir) => ({
-    config: parseConfig(JSON.parse(readFileSync(join(dir, "config.json"), "utf-8"))),
+    config: parseConfig(
+      JSON.parse(readFileSync(join(dir, "config.json"), "utf-8")),
+    ),
     configDir: dir,
   }));
   const config = mergeConfigs(layers);

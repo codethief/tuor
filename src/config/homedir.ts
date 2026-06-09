@@ -12,4 +12,3 @@ export function expandTilde(path: string, homeDir: string): string {
   if (path.startsWith("~/")) return homeDir + path.slice(1);
   return path;
 }
-

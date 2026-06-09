@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { findAllConfigDirs, mergeConfigs, type ConfigLayer } from "./merge.ts";
+import { type ConfigLayer, findAllConfigDirs, mergeConfigs } from "./merge.ts";
 import type { MountConfig, TuorConfig } from "./schema.ts";
 
 /** Minimal valid config (matching what parseConfig returns with defaults filled). */
@@ -7,15 +7,19 @@ function config(overrides: Partial<TuorConfig> = {}): TuorConfig {
   return { user: "root", workdir: "/", ...overrides };
 }
 
-function layer(configDir: string, overrides: Partial<TuorConfig> = {}): ConfigLayer {
+function layer(
+  configDir: string,
+  overrides: Partial<TuorConfig> = {},
+): ConfigLayer {
   return { config: config(overrides), configDir };
 }
 
 /** Mount config with required mode default. */
-function mount(overrides: Partial<MountConfig> & { hostPath: string }): MountConfig {
+function mount(
+  overrides: Partial<MountConfig> & { hostPath: string },
+): MountConfig {
   return { mode: "readonly", ...overrides };
 }
-
 
 describe("findAllConfigDirs", () => {
   test("returns home config first, then ancestors root-to-closest", () => {
@@ -26,7 +30,11 @@ describe("findAllConfigDirs", () => {
     ]);
     const exists = (p: string) => existing.has(p);
 
-    const result = findAllConfigDirs("/projects/myapp/src", "/home/user", exists);
+    const result = findAllConfigDirs(
+      "/projects/myapp/src",
+      "/home/user",
+      exists,
+    );
     expect(result).toEqual([
       "/home/user/.config/tuor",
       "/projects/.tuor",
@@ -59,12 +67,15 @@ describe("findAllConfigDirs", () => {
     const existing = new Set(["/home/user/.config/tuor/config.json"]);
     const exists = (p: string) => existing.has(p);
 
-    const result = findAllConfigDirs("/home/user/.config/tuor/sub", "/home/user", exists);
+    const result = findAllConfigDirs(
+      "/home/user/.config/tuor/sub",
+      "/home/user",
+      exists,
+    );
     expect(result).toEqual(["/home/user/.config/tuor"]);
     expect(result.length).toBe(1);
   });
 });
-
 
 describe("mergeConfigs", () => {
   test("single layer returns config unchanged (except path pre-resolution)", () => {
@@ -173,7 +184,11 @@ describe("mergeConfigs", () => {
         layer("/a", { env: { A: "parent", B: "only-parent" } }),
         layer("/b", { env: { A: "child", C: "only-child" } }),
       ]);
-      expect(result.env).toEqual({ A: "child", B: "only-parent", C: "only-child" });
+      expect(result.env).toEqual({
+        A: "child",
+        B: "only-parent",
+        C: "only-child",
+      });
     });
 
     test("parent env used when child has none", () => {
@@ -186,8 +201,12 @@ describe("mergeConfigs", () => {
 
     test("secrets merge like other env values", () => {
       const result = mergeConfigs([
-        layer("/a", { env: { KEY: { secret: true, fromHost: true, hosts: ["a.com"] } } }),
-        layer("/b", { env: { OTHER: { secret: true, fromHost: "X", hosts: ["b.com"] } } }),
+        layer("/a", {
+          env: { KEY: { secret: true, fromHost: true, hosts: ["a.com"] } },
+        }),
+        layer("/b", {
+          env: { OTHER: { secret: true, fromHost: "X", hosts: ["b.com"] } },
+        }),
       ]);
       expect(result.env).toEqual({
         KEY: { secret: true, fromHost: true, hosts: ["a.com"] },
@@ -204,8 +223,12 @@ describe("mergeConfigs", () => {
   describe("network: mode from child, hosts concatenated", () => {
     test("both restricted: hosts are concatenated and deduplicated", () => {
       const result = mergeConfigs([
-        layer("/a", { network: { mode: "restricted", allowedHosts: ["a.com", "b.com"] } }),
-        layer("/b", { network: { mode: "restricted", allowedHosts: ["b.com", "c.com"] } }),
+        layer("/a", {
+          network: { mode: "restricted", allowedHosts: ["a.com", "b.com"] },
+        }),
+        layer("/b", {
+          network: { mode: "restricted", allowedHosts: ["b.com", "c.com"] },
+        }),
       ]);
       expect(result.network).toEqual({
         mode: "restricted",
@@ -215,16 +238,25 @@ describe("mergeConfigs", () => {
 
     test("allowedInternalHosts also merged", () => {
       const result = mergeConfigs([
-        layer("/a", { network: { mode: "restricted", allowedInternalHosts: ["int.a"] } }),
-        layer("/b", { network: { mode: "restricted", allowedInternalHosts: ["int.b"] } }),
+        layer("/a", {
+          network: { mode: "restricted", allowedInternalHosts: ["int.a"] },
+        }),
+        layer("/b", {
+          network: { mode: "restricted", allowedInternalHosts: ["int.b"] },
+        }),
       ]);
       expect(result.network!.mode).toBe("restricted");
-      expect((result.network as any).allowedInternalHosts).toEqual(["int.a", "int.b"]);
+      expect((result.network as any).allowedInternalHosts).toEqual([
+        "int.a",
+        "int.b",
+      ]);
     });
 
     test("child open overrides parent restricted", () => {
       const result = mergeConfigs([
-        layer("/a", { network: { mode: "restricted", allowedHosts: ["a.com"] } }),
+        layer("/a", {
+          network: { mode: "restricted", allowedHosts: ["a.com"] },
+        }),
         layer("/b", { network: { mode: "open" } }),
       ]);
       expect(result.network).toEqual({ mode: "open" });
@@ -233,9 +265,14 @@ describe("mergeConfigs", () => {
     test("child restricted overrides parent open", () => {
       const result = mergeConfigs([
         layer("/a", { network: { mode: "open" } }),
-        layer("/b", { network: { mode: "restricted", allowedHosts: ["x.com"] } }),
+        layer("/b", {
+          network: { mode: "restricted", allowedHosts: ["x.com"] },
+        }),
       ]);
-      expect(result.network).toEqual({ mode: "restricted", allowedHosts: ["x.com"] });
+      expect(result.network).toEqual({
+        mode: "restricted",
+        allowedHosts: ["x.com"],
+      });
     });
 
     test("parent network used when child has none", () => {
@@ -255,8 +292,12 @@ describe("mergeConfigs", () => {
   describe("path pre-resolution", () => {
     test("relative mount hostPath resolved against source configDir", () => {
       const result = mergeConfigs([
-        layer("/home/.config/tuor", { mounts: [mount({ hostPath: "../projects" })] }),
-        layer("/work/project/.tuor", { mounts: [mount({ hostPath: "../shared" })] }),
+        layer("/home/.config/tuor", {
+          mounts: [mount({ hostPath: "../projects" })],
+        }),
+        layer("/work/project/.tuor", {
+          mounts: [mount({ hostPath: "../shared" })],
+        }),
       ]);
       expect(result.mounts![0]!.hostPath).toBe("/home/.config/projects");
       expect(result.mounts![1]!.hostPath).toBe("/work/project/shared");
@@ -279,7 +320,9 @@ describe("mergeConfigs", () => {
     test("host: ignoreFileRefs pre-resolved against source configDir", () => {
       const result = mergeConfigs([
         layer("/home/.config/tuor", {
-          mounts: [mount({ hostPath: "/data", ignoreFileRefs: ["host:./myignore"] })],
+          mounts: [
+            mount({ hostPath: "/data", ignoreFileRefs: ["host:./myignore"] }),
+          ],
         }),
       ]);
       expect(result.mounts![0]!.ignoreFileRefs).toContain(
@@ -290,7 +333,9 @@ describe("mergeConfigs", () => {
     test("mount: ignoreFileRefs left unchanged", () => {
       const result = mergeConfigs([
         layer("/any", {
-          mounts: [mount({ hostPath: "/data", ignoreFileRefs: ["mount:.tuorignore"] })],
+          mounts: [
+            mount({ hostPath: "/data", ignoreFileRefs: ["mount:.tuorignore"] }),
+          ],
         }),
       ]);
       expect(result.mounts![0]!.ignoreFileRefs).toContain("mount:.tuorignore");
@@ -309,7 +354,11 @@ describe("mergeConfigs", () => {
     test("workdir MountConfig hostPath pre-resolved", () => {
       const result = mergeConfigs([
         layer("/project/.tuor", {
-          workdir: { hostPath: "..", guestPath: "/workspace", mode: "readonly" as const },
+          workdir: {
+            hostPath: "..",
+            guestPath: "/workspace",
+            mode: "readonly" as const,
+          },
         }),
       ]);
       const wd = result.workdir as MountConfig;
@@ -340,7 +389,11 @@ describe("mergeConfigs", () => {
       expect(result.user).toBe("root");
 
       // Env: shallow merge
-      expect(result.env).toEqual({ EDITOR: "nano", PROJECT: "myproj", APP: "myapp" });
+      expect(result.env).toEqual({
+        EDITOR: "nano",
+        PROJECT: "myproj",
+        APP: "myapp",
+      });
 
       // Mounts: concatenated in order
       expect(result.mounts).toHaveLength(3);

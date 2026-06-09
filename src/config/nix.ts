@@ -1,6 +1,6 @@
 import { existsSync, realpathSync } from "node:fs";
-import type { NixConfig } from "./schema.ts";
 import type { MountSpec } from "../core/mounts.ts";
+import type { NixConfig } from "./schema.ts";
 
 // --- Types ---
 
@@ -62,15 +62,11 @@ const FORWARDED_ENV_VARS: { key: string; kind: "path" | "path-list" }[] = [
   { key: "TZDIR", kind: "path" },
 ];
 
-
 /**
  * Resolve explicit profile paths to their real paths, validating that each
  * resolves to somewhere under /nix/.
  */
-function resolveExplicitProfiles(
-  profiles: string[],
-  deps: NixDeps,
-): string[] {
+function resolveExplicitProfiles(profiles: string[], deps: NixDeps): string[] {
   return profiles.map((p) => {
     const resolved = deps.realpath(p);
     if (!resolved.startsWith("/nix/")) {
@@ -84,7 +80,12 @@ function resolveExplicitProfiles(
 
 function buildMounts(config: NixConfig, deps: NixDeps): MountSpec[] {
   const mounts: MountSpec[] = [
-    { hostPath: "/nix", guestPath: "/nix", mode: "readonly", shadowPatterns: [] },
+    {
+      hostPath: "/nix",
+      guestPath: "/nix",
+      mode: "readonly",
+      shadowPatterns: [],
+    },
   ];
 
   if (config.nixLd) {
@@ -94,7 +95,12 @@ function buildMounts(config: NixConfig, deps: NixDeps): MountSpec[] {
           "Is nix-ld installed?",
       );
     }
-    mounts.push({ hostPath: "/lib64", guestPath: "/lib64", mode: "readonly", shadowPatterns: [] });
+    mounts.push({
+      hostPath: "/lib64",
+      guestPath: "/lib64",
+      mode: "readonly",
+      shadowPatterns: [],
+    });
   }
 
   return mounts;
@@ -172,7 +178,7 @@ function resolveToNixStore(
 export function _resolveDefaultProfiles(
   hostEnv: Record<string, string | undefined>,
 ): string[] {
-  const nixProfiles = hostEnv["NIX_PROFILES"];
+  const nixProfiles = hostEnv.NIX_PROFILES;
   if (!nixProfiles) {
     return [];
   }
@@ -199,5 +205,3 @@ const defaultNixDeps: NixDeps = {
   lib64Exists: () => existsSync("/lib64"),
   warn: (message) => console.warn(`[nix] ${message}`),
 };
-
-

@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
 import { MemoryProvider } from "@earendil-works/gondolin";
+import { describe, expect, test } from "vitest";
 import { OverlayProvider } from "./overlay-provider.ts";
 
 /** Create a MemoryProvider with some pre-populated files. */

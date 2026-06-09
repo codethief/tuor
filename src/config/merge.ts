@@ -84,19 +84,19 @@ function mergeTwoConfigs(parent: TuorConfig, child: TuorConfig): TuorConfig {
     // Scalars: child wins (fall back to parent for defaults)
     user: child.user,
     workdir: child.workdir,
-    ...(lastDefined(child.guestHomeDir, parent.guestHomeDir, "guestHomeDir")),
-    ...(lastDefined(child.rootfsSize, parent.rootfsSize, "rootfsSize")),
-    ...(lastDefined(child.nix, parent.nix, "nix")),
+    ...lastDefined(child.guestHomeDir, parent.guestHomeDir, "guestHomeDir"),
+    ...lastDefined(child.rootfsSize, parent.rootfsSize, "rootfsSize"),
+    ...lastDefined(child.nix, parent.nix, "nix"),
 
     // Arrays: concatenate
-    ...(mergeArrayField(parent.mounts, child.mounts, "mounts")),
-    ...(mergeArrayField(parent.volumes, child.volumes, "volumes")),
+    ...mergeArrayField(parent.mounts, child.mounts, "mounts"),
+    ...mergeArrayField(parent.volumes, child.volumes, "volumes"),
 
     // Objects: shallow merge
-    ...(mergeEnv(parent.env, child.env)),
+    ...mergeEnv(parent.env, child.env),
 
     // Network: merge mode + concatenate host lists
-    ...(mergeNetwork(parent.network, child.network)),
+    ...mergeNetwork(parent.network, child.network),
   };
 }
 
@@ -145,12 +145,16 @@ function mergeNetwork(
   return {
     network: {
       mode: "restricted",
-      ...(mergeStringArrayField(
-        parentNet.allowedHosts, childNet.allowedHosts, "allowedHosts",
-      )),
-      ...(mergeStringArrayField(
-        parentNet.allowedInternalHosts, childNet.allowedInternalHosts, "allowedInternalHosts",
-      )),
+      ...mergeStringArrayField(
+        parentNet.allowedHosts,
+        childNet.allowedHosts,
+        "allowedHosts",
+      ),
+      ...mergeStringArrayField(
+        parentNet.allowedInternalHosts,
+        childNet.allowedInternalHosts,
+        "allowedInternalHosts",
+      ),
     },
   };
 }
@@ -190,7 +194,9 @@ function preResolveMountPaths(m: MountConfig, configDir: string): MountConfig {
 
   // Pre-resolve host: ignoreFileRefs so they don't depend on configDir later
   const rawRefs = m.ignoreFileRefs ?? DEFAULT_IGNORE_FILE_REFS;
-  const ignoreFileRefs = rawRefs.map((ref) => preResolveIgnoreFileRef(ref, configDir));
+  const ignoreFileRefs = rawRefs.map((ref) =>
+    preResolveIgnoreFileRef(ref, configDir),
+  );
 
   return {
     ...m,

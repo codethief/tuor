@@ -1,14 +1,14 @@
+import type { Dirent } from "node:fs";
 import path from "node:path";
 import { getSystemErrorName } from "node:util";
-import type { Dirent } from "node:fs";
 import {
   ERRNO,
   isWriteFlag,
   normalizeVfsPath,
-  VirtualProviderClass,
-  type VirtualProvider,
-  type VirtualFileHandle,
   type VfsStatfs,
+  type VirtualFileHandle,
+  type VirtualProvider,
+  VirtualProviderClass,
 } from "@earendil-works/gondolin";
 
 // --- Constants ---
@@ -414,8 +414,7 @@ export class OverlayProvider
     const p = normalizeVfsPath(entryPath);
     if (this.hasWhiteoutSync(p)) throw enoent("realpath", p);
     try {
-      if (this.upper.realpathSync)
-        return this.upper.realpathSync(p, options);
+      if (this.upper.realpathSync) return this.upper.realpathSync(p, options);
       this.upper.statSync(p);
       return p;
     } catch (err) {
