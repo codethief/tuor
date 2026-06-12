@@ -1,134 +1,168 @@
-# Tuor, a CLI for sandboxing coding agents and other dev tools
-Tuor is a convenience wrapper around
-[Gondolin](https://github.com/earendil-works/gondolin), a tool for configuring &
-spawning Linux micro VMs through a TypeScript API (mainly for the purpose of
-sandboxing coding agents).
+# Tuor – strong sandboxing for AI agents
+Tuor is a command line tool to spawn microVM-based sandboxes that you
+can run your coding agent or other workloads in. Under the hood, Tuor uses
+[Gondolin](https://github.com/earendil-works/gondolin) for the actual sandbox
+and largely provides a convenience wrapper.
 
-While Gondolin focuses on the low-level virtualization plumbing and on providing
-a great and flexible API, Tuor's goal is to provide an easy-to-use CLI for
-common use cases and make using micro VMs for development – whether agentic
-coding or otherwise¹ – as convenient as possible. (¹ I have always been
-terrified of blindly `npm install`ing hundreds of packages…)
-
-However, I don't know yet what "convenience" will look like – part of
-building Tuor is figuring that out. For now I'm just trying to scratch my own
-itch and to get something halfway decent working, which integrates nicely with
-my personal workflow.
+Tuor is still experimental and what "convenience" looks like exactly is still to
+be seen – part of building Tuor is figuring that out. For now I'm just trying to
+scratch my own itch and get something halfway decent working that integrates
+nicely with my personal workflow.
 
 
-# General dependencies
-- Gondolin runtime dependencies (QEMU)
+## Features
+- **Isolation**: Strong[^1], microVM-based isolation between workload and host
+  system using QEMU as hypervisor.
+- **Persistence**: VM disk images are treated as disposable and will be deleted
+  upon VM shutdown. To persist data, create a volume or mount host directories
+  into the guest – either as read-only, read/write, or using an overlay file system
+  (guest may write but host files stay unchanged).
+- **Hide host files**: Within a mounted directory, hide select files (e.g.
+  `.envrc` files with credentials) from the VM guest.
+- **Network control**: Restrict network access to HTTP and specific hosts. DNS
+  is provided by the sandbox, so as to prevent data exfiltration through UDP 53. 
+- **Secret injection**: Prevent the guest from seeing your auth tokens &
+  secrets, by having Tuor inject them into HTTP requests as the latter leave the
+  sandbox.
+- **Env vars**: Control which environment variables get passed through to the
+  VM.
+- **File-based configuration**: Easily fine-tune your VM configuration on a
+  project-by-project or folder-by-folder basis, while defining global defaults
+  in `~/.config/tuor/config.json`.
+- **Rootfs**: (Soon) Configure the VM's rootfs by providing an OCI container
+  image. Currently, the VM's base image & kernel are based on
+  `alpine-base:latest`.
+- **Convenience mode for NixOS users**: Mount Nix store & related dirs into the
+  VM, set up PATH & other env vars, etc.
+- **Platform support**: Should run on both Linux and MacOS. ("should" because I
+  can only test on Linux. Feel free to report bugs!)
+- **VM nesting**: Run inside existing VMs, even when KVM is not available.
+  (Thanks, QEMU!)
 
 
-# Usage
-I haven't gotten around packaging Tuor yet; please see the development
-instructions below for installation instructions.
+## Getting started & usage
+### Requirements:
+- QEMU (`qemu-system-arm` on Debian/Ubuntu, `qemu` on MacOS (Brew))
+- Node.js (as this is what Gondolin provides the API in)
 
-Tuor looks for a `.tuor/config.json` file in the current working directory to
-configure the VM. It uses Gondolin's default Alpine-based image and layers
-host-side mounts on top. Example config:
+
+### Installation:
+```shell
+npm install -g tuor
+```
+
+### Commands:
+```shell
+tuor init  # Create default config in ./.tuor/, which is also where VM state (overlays, volumes) will be stored
+tuor run  # Spawn VM with interactive shell, based on config in nearest .tuor directory
+tuor run -- echo "hi"  # Spawn VM and run custom command
+```
+
+
+## Example `config.json`
+Place this in a `.tuor/` folder in your project directory or in
+`~/.config/tuor/`. (The local `config.json` in your project inherits from the
+global one in the homedir.) 
 
 ```javascript
 {
-  "user": "root",  // User must currently be root or the user with UID 1000 (or whatever UID you use on the host), see https://github.com/earendil-works/gondolin/issues/74
-  "network": {  // Optional: network egress policy (default: restricted, block all)
-    "mode": "restricted",  // "open" for unrestricted access, "restricted" for allowlist
-    "allowedHosts": ["*.github.com", "api.anthropic.com"],  // Allow HTTPS traffic to these hosts
-    "allowedInternalHosts": ["local-llm.my.corp"]  // Like allowedHosts but for hosts pointing at private IPs (which are otherwise blocked to prevent DNS rebinding attacks)
+  "network": {
+    // "open" for unrestricted access, "restricted" for allowlist
+    "mode": "restricted",
+    // Allow HTTPS traffic to these hosts
+    "allowedHosts": ["*.github.com", "api.anthropic.com"],
+    // Like allowedHosts but for hosts pointing at private IPs (which are 
+    // otherwise blocked to prevent DNS rebinding attacks)
+    "allowedInternalHosts": ["local-llm.my.corp"]
   },
-  "workdir": {
-      "hostPath": "..",  // relative to config.json
-      "guestPath": "/workspace"  // Can be omitted, in which case guestPath will be set to the resolved (absolute) hostPath
-  },
-  "rootfsSize": "2G",  // Optional: minimum virtual disk size (COW overlay, so actual host usage stays sparse). When increased, the VM's file system will be expanded during VM boot-up.
-  "env": {  // Optional: environment variables to set in the guest
-    "MY_VAR": "fixed_value",  // Literal value
+  "env": {
+    "SOME_VAR": "fixed_value",  // Literal value
+    "MY_VAR": { "fromHost": "MY_VARIABLE" }  // Read from host env (different name)
     "EDITOR": { "fromHost": true },  // Read from host env (same var name)
-    "DB_URL": { "fromHost": "DATABASE_URL" }  // Read from host env (different var name)
+    "AUTH_TOKEN": { 
+      "fromHost": true,
+      "hosts": ["my-api.hostname.com"]
+    }
   },
   "mounts": [
     {
+      // Absolute or relative to config.json
       "hostPath": "/path/on/the/host",
+      // Can be omitted, in which case guestPath will be set to the resolved 
+      // (absolute) hostPath.
       "guestPath": "/path/on/the/guest",
-      "mode": "overlay",  // Will store changes in .tuor/.state/overlays/
-      "ignore": [".env", "secrets"],  // Optional: explicit paths to hide from the guest
-      "ignoreFileRefs": ["host:./tuorignore", "mount:.tuorignore"]  // Optional, shown here with default value
+      // Will do copy-on-write and persist changes to .tuor/.state/overlays/
+      "mode": "overlay",
+      // Optional: Explicit paths to hide from the guest
+      "ignore": [".env", "secret.key", ".tuor"],
+      // Files to read list of ignored files from (think .gitignore). Paths are 
+      // either host paths or mount-relative paths.
+      "ignoreFileRefs": ["host:./tuorignore", "mount:.tuorignore"]
     }
   ],
-  // Optional: persistent guest directories without a host backing directory (similar to Docker volumes)
+  // Minimum virtual disk size (COW overlay, so actual host usage stays 
+  // sparse). Note that the virtual disk will be discarded on VM shutdown,
+  // so it is not meant for persisting data across VM boots. (Use mounts & 
+  // volumes, instead!)
+  "rootfsSize": "2G",
+  // Constraint: Guest user must currently be root
+  "user": "root",
+  // Persistent guest directories without a host backing directory (
+  // similar to Docker volumes)
   "volumes": [
-    { "guestPath": "~/.claude" }
-  ]
+    { "guestPath": "~/.claude" }  // Persist Claude Code state
+  ],
+  // Instead of a string (guest path) you can also provide a mount config here
+  // for convenience, e.g. 
+  // { hostPath: "..", guestPath: "/workspace", mode: "readwrite" }
+  "workdir": "/workspace"
 }
 ```
 
-## Ignore files
-
-Tuor can hide host files from mounted directories using ignore files (one path
-per line, `#` for comments). Each mount has an `ignoreFileRefs` list that
-defaults to `["host:./tuorignore", "mount:.tuorignore"]`, meaning:
-
-- **`host:./tuorignore`** — a shared ignore file in the `.tuor/` config directory
-- **`mount:.tuorignore`** — per-directory `.tuorignore` files inside the mounted
-  host directory (recursive lookup, like `.gitignore`)
-
-The `host:` prefix resolves paths relative to the `.tuor/` config dir (or
-absolute). The `mount:` prefix resolves within the mounted host directory —
-relative paths trigger recursive lookup, absolute paths match a single file.
-
-Patterns from `ignoreFileRefs` are merged with any explicit `ignore` list on the
-mount. Missing ignore files are silently skipped.
-
-### Pattern matching rules
-
-- **Bare name** (no `/`): matches at any depth. E.g. `.envrc` hides `/.envrc`,
-  `/sub/.envrc`, `/a/b/.envrc`, etc.
-- **Path containing `/`**: anchored to the mount root. E.g. `sub/.envrc` only
-  hides `/sub/.envrc`.
-- A trailing `/` is stripped before matching (it does *not* restrict matching to
-  directories only). Exception: a bare `/` is not stripped.
-- A match on a path also hides everything below it (e.g. `.git` hides
-  `.git/config`).
-- Globs (`**/foo/bar*`) are not supported yet.
-
-### Caveats
-
-Ignore files are loaded once at boot. Changes require a VM restart.
+For a detailed description of all config options, please see
+[`src/config/schema.ts`](./src/config/schema.ts).
 
 
-## Volumes
-
-Volumes are persistent guest directories without a host backing directory —
-similar to Docker volumes. Data is stored on the host in
-`.tuor/.state/overlays/<sanitized guest path>` and persists across VM rebuilds.
-
-Unlike mounts, volumes have no `hostPath`, no ignore patterns, and no mode
-selection — they are always read-write.
-
-Guest paths across mounts and volumes must not collide.
+## Security & threat model
+- [How to report vulnerabilities](./SECURITY.md).
+- Since Tuor is a relatively thin wrapper around Gondolin, it follows the same
+  [architecture](https://earendil-works.github.io/gondolin/architecture/) and
+  [threat model](https://github.com/earendil-works/gondolin/security).
 
 
-# Development
-For the bootstrap you need to have [mise](https://mise.jdx.dev) installed. Then
-do:
+## Development
+We use [mise](https://mise.jdx.dev) for the bootstrap. Then do:
 
 ```
 mise install
 npm install
 ```
 
-```
-npm start  # Fire up Tuor (will look for a .tuor/config.json in the current directory)
-npm test
+Available commands (compare `package.json`):
+
+```shell
+npm run start  # Fire up Tuor right from the source code (without building)
+npm run build  # Build for release
+npm run lint
+npm run test
 npm run typecheck
 ```
 
 
-# Security and threat model
-Since Tuor is a wrapper around Gondolin, [Gondolin's security
-guarantees](https://earendil-works.github.io/gondolin/security/) apply.
+## Similar projects
+Other sandboxes I am aware of that provide comparable features & security
+guarantees[^1]:
+- [Alibaba OpenSandbox](https://github.com/alibaba/OpenSandbox/)
+- [Docker Sandbox](https://docs.docker.com/ai/sandboxes/)
+- [Matchlock](https://github.com/jingkaihe/matchlock)
+
+[^1]: Kernel-based mechanisms for workload isolation such as
+    user/mount/network/… namespaces (e.g. Docker containers) & landlock are just
+    not enough!
 
 
-# Acknowledgments
-Given that Tuor is mainly a thin wrapper around Gondolin, the actual & difficult
-work is done by Gondolin's maintainer @mitsuhiko. Huge thanks to him!
+## Acknowledgements
+Tuor is standing on the shoulders of giants and wouldn't be possible without
+[Gondolin](https://github.com/earendil-works/gondolin) and
+[QEMU](https://www.qemu.org/), which do all the heavy lifting. Huge thanks to
+their maintainers!
