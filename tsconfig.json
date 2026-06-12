@@ -27,7 +27,7 @@
     "noPropertyAccessFromIndexSignature": false,
 
     // https://nodejs.org/en/learn/typescript/run-natively
-    "erasableSyntaxOnly": true,
+    "erasableSyntaxOnly": true
   },
   "include": ["src"]
 }

@@ -2,7 +2,6 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { scope, type } from "arktype";
 
-
 const types = scope({
   // --------------------------------------------------------------------------
   // Config root
@@ -42,7 +41,7 @@ const types = scope({
      */
     "rootfsSize?": "string > 0",
 
-    /** 
+    /**
      * The user to open the shell under and to make mounted directories
      * available for. Must currently be root due to Gondolin-related
      * constraints.
@@ -60,7 +59,6 @@ const types = scope({
      */
     workdir: "WorkdirConfig = '/'",
   },
-
 
   // --------------------------------------------------------------------------
   // Environment variables
@@ -89,7 +87,6 @@ const types = scope({
   /** An env var value: literal, host-sourced, or a secret. */
   EnvValue: "string | EnvValueFromHost | EnvSecret",
 
-
   // --------------------------------------------------------------------------
   // Mounting & volumes, working directory
   // --------------------------------------------------------------------------
@@ -98,7 +95,7 @@ const types = scope({
     "+": "reject",
     /** Absolute path or path relative to directory containing config file */
     hostPath: "string > 0",
-    /** 
+    /**
      * If guestPath is not given explicitly, it will be the same path as on the
      * host.
      */
@@ -136,7 +133,7 @@ const types = scope({
 
   /** Path starting with / */
   AbsolutePath: type("string > 0").matching(/^\//),
-  /** 
+  /**
    * Path starting with ~ (bare "~" or "~/…"), expanded either on the host or on
    * the guest (see config.guestHomeDir).
    */
@@ -151,15 +148,14 @@ const types = scope({
    *   VM shutdown)
    */
   MountMode: "'readwrite' | 'readonly' | 'overlay' | 'overlay-tmpfs'",
-  
 
   // --------------------------------------------------------------------------
   // Network
   // --------------------------------------------------------------------------
 
-  /** 
+  /**
    * Network mode: unrestricted access (`open`) or restricted to an allowlist of
-   * hosts that the guest can connect to via HTTP/HTTPS. 
+   * hosts that the guest can connect to via HTTP/HTTPS.
    */
   NetworkConfig: [
     { "+": "reject", mode: "'open'" },
@@ -182,14 +178,13 @@ const types = scope({
     },
   ],
 
-
   // --------------------------------------------------------------------------
   // NixOS convenience mode
   // --------------------------------------------------------------------------
 
   /**
-   * When a Nix config is present, Tuor will 
-   * - mount /nix into the VM read-only. 
+   * When a Nix config is present, Tuor will
+   * - mount /nix into the VM read-only.
    * - in the guest set NIX_SSL_CERT_FILE to Gondolin's certificate bundle,
    *   which contains the cert required for intercepting HTTPS requests.
    * - forward host env variables (LOCALE_ARCHIVE, TZDIR) to the guest, after
@@ -202,7 +197,7 @@ const types = scope({
      * symlinks). Auto-detected from $NIX_PROFILES if omitted.
      */
     "profiles?": "AbsolutePath[]",
-    /** 
+    /**
      * Enable nix-ld support:
      * - Mount /lib64 (read-only)
      * - Forward NIX_LD_LIBRARY_PATH env var to the guest, after resolving it to
@@ -210,8 +205,6 @@ const types = scope({
      */
     nixLd: "boolean = false",
   },
-
-
 }).export();
 
 export type VolumeConfig = typeof types.VolumeConfig.infer;
