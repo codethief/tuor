@@ -245,11 +245,10 @@ describe("mergeConfigs", () => {
           network: { mode: "restricted", allowedInternalHosts: ["int.b"] },
         }),
       ]);
-      expect(result.network!.mode).toBe("restricted");
-      expect((result.network as any).allowedInternalHosts).toEqual([
-        "int.a",
-        "int.b",
-      ]);
+      expect(result.network).toEqual({
+        mode: "restricted",
+        allowedInternalHosts: ["int.a", "int.b"],
+      });
     });
 
     test("child open overrides parent restricted", () => {
