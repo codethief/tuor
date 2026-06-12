@@ -57,6 +57,8 @@ const GONDOLIN_CA_BUNDLE = "/run/gondolin/ca-certificates.crt";
  * component is resolved individually and non-/nix/ entries are filtered out.
  */
 const FORWARDED_ENV_VARS: { key: string; kind: "path" | "path-list" }[] = [
+  // TODO NIX_LD_LIBRARY_PATH should only be forwarded if config.nixLd is
+  //      enabled.
   { key: "NIX_LD_LIBRARY_PATH", kind: "path-list" },
   { key: "LOCALE_ARCHIVE", kind: "path" },
   { key: "TZDIR", kind: "path" },
