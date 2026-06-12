@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
   "formatter": {
     "indentStyle": "space",
     "indentWidth": 2,
@@ -10,7 +10,7 @@
       "recommended": true,
       "style": {
         "noNonNullAssertion": "off",
-        "useTemplate": "warn"
+        "useTemplate": "off"
       }
     }
   }
