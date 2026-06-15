@@ -64,7 +64,7 @@ them here for completeness.
 
 ### Installation:
 ```shell
-npm install -g tuor
+npm install -g tuor-sandbox
 ```
 
 ### Commands:
