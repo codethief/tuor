@@ -1,4 +1,4 @@
-# 0.1.0 (2026-XX-XX)
+# 0.1.0 (2026-06-15)
 Initial release.
 
 - Config discovery & merging
