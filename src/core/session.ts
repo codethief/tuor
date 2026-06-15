@@ -57,6 +57,7 @@ export async function runSession(
   const mergedEnv = { ...spec.env, ...placeholderSecretsEnv };
   const hasEnv = Object.keys(mergedEnv).length > 0;
 
+  console.log("Starting VM…");
   const vm = await VM.create({
     ...networkOptions,
     ...(spec.rootfsSize ? { rootfs: { size: spec.rootfsSize } } : {}),
@@ -64,6 +65,11 @@ export async function runSession(
     ...(hasVfsMounts ? { vfs: { mounts: vfsMounts } } : {}),
   });
 
+  if (command) {
+    console.log("Executing user command…");
+  } else {
+    console.log("Spawning shell…");
+  }
   // `su myuser` gives us an interactive non-login shell (`su - myuser` would
   // give us a login shell but would also cd into the user's home dir, messing
   // with the cwd we configure below.)
