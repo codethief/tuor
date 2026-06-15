@@ -4,9 +4,12 @@
   "author": "codethief <git@codethief.eu>",
   "license": "Apache-2.0",
   "type": "module",
-  "private": true,
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md"
   ],
   "engines": {
     "node": ">=22"
