@@ -77,8 +77,9 @@ tuor run -- echo "hi"  # Spawn VM and run custom command
 
 ## Example `config.json`
 Place this in a `.tuor/` folder in your project directory or in
-`~/.config/tuor/`. (The local `config.json` in your project inherits from the
-global one in the homedir.)
+`~/.config/tuor/`. (Configs in child directories inherit from configs in parent
+directories (and so on), which in turn inherit from the global
+`~/.config/tuor/config.json`.)
 
 ```javascript
 {
