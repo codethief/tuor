@@ -1,13 +1,25 @@
 # Tuor – strong sandboxing for AI agents
-Tuor is a command line tool to spawn microVM-based sandboxes that you
-can run your coding agent or other workloads in. Under the hood, Tuor uses
+Tuor is a command line tool to spawn microVM-based sandboxes that you can run
+your coding agent or other workloads in. Under the hood, Tuor uses the excellent
 [Gondolin](https://github.com/earendil-works/gondolin) for the actual sandbox
-and largely provides a convenience wrapper.
+and largely provides a convenience wrapper (config schema & lookup) and a few
+other niceties (overlayfs, hide specific files within mounts, Nix mode, etc.).
 
-Tuor is still experimental and what "convenience" looks like exactly is still to
-be seen – part of building Tuor is figuring that out. For now I'm just trying to
-scratch my own itch and get something halfway decent working that integrates
-nicely with my personal workflow.
+
+## What is Tuor's raison d'être?
+There are relatively few agent sandboxing solutions out there that provide
+strong[^1] virtualization-based isolation (see "similar projects" below). Among
+those, I have really liked Gondolin but since it's mostly just an SDK, to me the
+final step – a good UI – was still missing. Tuor is trying to fill this gap.
+
+None of the features Tuor provides on top of Gondolin are particularly difficult
+to build. But they're still cumbersome if you (or everyone in your organization)
+need to build them every single time.
+
+
+## Project status
+Tuor is **experimental** and config schema and feature set might change at any
+time, while I'm still trying to figure out what works best for my own workflow.
 
 
 ## Features
@@ -20,7 +32,7 @@ nicely with my personal workflow.
 - **Hide host files**: Within a mounted directory, hide select files (e.g.
   `.envrc` files with credentials) from the VM guest.
 - **Network control**: Restrict network access to HTTP and specific hosts. DNS
-  is provided by the sandbox, so as to prevent data exfiltration through UDP 53. 
+  is provided by the sandbox, so as to prevent data exfiltration through UDP 53.
 - **Secret injection**: Prevent the guest from seeing your auth tokens &
   secrets, by having Tuor inject them into HTTP requests as the latter leave the
   sandbox.
@@ -32,12 +44,16 @@ nicely with my personal workflow.
 - **Rootfs**: (Soon) Configure the VM's rootfs by providing an OCI container
   image. Currently, the VM's base image & kernel are based on
   `alpine-base:latest`.
-- **Convenience mode for NixOS users**: Mount Nix store & related dirs into the
-  VM, set up PATH & other env vars, etc.
+- **Convenience mode for NixOS users**: Have Tuor mount Nix store & related
+  dirs into the VM, set up PATH & other env vars, etc.
 - **Platform support**: Should run on both Linux and MacOS. ("should" because I
   can only test on Linux. Feel free to report bugs!)
 - **VM nesting**: Run inside existing VMs, even when KVM is not available.
   (Thanks, QEMU!)
+
+Again, most of these features are already provided by
+[Gondolin](https://github.com/earendil-works/gondolin) – I am merely listing
+them here for completeness.
 
 
 ## Getting started & usage
@@ -62,7 +78,7 @@ tuor run -- echo "hi"  # Spawn VM and run custom command
 ## Example `config.json`
 Place this in a `.tuor/` folder in your project directory or in
 `~/.config/tuor/`. (The local `config.json` in your project inherits from the
-global one in the homedir.) 
+global one in the homedir.)
 
 ```javascript
 {
@@ -71,7 +87,7 @@ global one in the homedir.)
     "mode": "restricted",
     // Allow HTTPS traffic to these hosts
     "allowedHosts": ["*.github.com", "api.anthropic.com"],
-    // Like allowedHosts but for hosts pointing at private IPs (which are 
+    // Like allowedHosts but for hosts pointing at private IPs (which are
     // otherwise blocked to prevent DNS rebinding attacks)
     "allowedInternalHosts": ["local-llm.my.corp"]
   },
@@ -79,7 +95,7 @@ global one in the homedir.)
     "SOME_VAR": "fixed_value",  // Literal value
     "MY_VAR": { "fromHost": "MY_VARIABLE" }  // Read from host env (different name)
     "EDITOR": { "fromHost": true },  // Read from host env (same var name)
-    "AUTH_TOKEN": { 
+    "AUTH_TOKEN": {
       "fromHost": true,
       "hosts": ["my-api.hostname.com"]
     }
@@ -88,21 +104,21 @@ global one in the homedir.)
     {
       // Absolute or relative to config.json
       "hostPath": "/path/on/the/host",
-      // Can be omitted, in which case guestPath will be set to the resolved 
+      // Can be omitted, in which case guestPath will be set to the resolved
       // (absolute) hostPath.
       "guestPath": "/path/on/the/guest",
       // Will do copy-on-write and persist changes to .tuor/.state/overlays/
       "mode": "overlay",
       // Optional: Explicit paths to hide from the guest
       "ignore": [".env", "secret.key", ".tuor"],
-      // Files to read list of ignored files from (think .gitignore). Paths are 
+      // Files to read list of ignored files from (think .gitignore). Paths are
       // either host paths or mount-relative paths.
       "ignoreFileRefs": ["host:./tuorignore", "mount:.tuorignore"]
     }
   ],
-  // Minimum virtual disk size (COW overlay, so actual host usage stays 
+  // Minimum virtual disk size (COW overlay, so actual host usage stays
   // sparse). Note that the virtual disk will be discarded on VM shutdown,
-  // so it is not meant for persisting data across VM boots. (Use mounts & 
+  // so it is not meant for persisting data across VM boots. (Use mounts &
   // volumes, instead!)
   "rootfsSize": "2G",
   // Constraint: Guest user must currently be root
@@ -113,7 +129,7 @@ global one in the homedir.)
     { "guestPath": "~/.claude" }  // Persist Claude Code state
   ],
   // Instead of a string (guest path) you can also provide a mount config here
-  // for convenience, e.g. 
+  // for convenience, e.g.
   // { hostPath: "..", guestPath: "/workspace", mode: "readwrite" }
   "workdir": "/workspace"
 }
@@ -131,7 +147,7 @@ For a detailed description of all config options, please see
 
 
 ## Development
-We use [mise](https://mise.jdx.dev) for the bootstrap. Then do:
+We use [mise](https://mise.jdx.dev) for the bootstrap. Once mise is installed, do:
 
 ```
 mise install
@@ -156,13 +172,13 @@ guarantees[^1]:
 - [Docker Sandbox](https://docs.docker.com/ai/sandboxes/)
 - [Matchlock](https://github.com/jingkaihe/matchlock)
 
-[^1]: Kernel-based mechanisms for workload isolation such as
-    user/mount/network/… namespaces (e.g. Docker containers) & landlock are just
-    not enough!
+[^1]: Host kernel-based mechanisms for workload isolation such as landlock and
+    Linux namespaces (e.g. Docker containers) are just not enough. Agents are
+    getting too good at writing kernel exploits.
 
 
 ## Acknowledgements
-Tuor is standing on the shoulders of giants and wouldn't be possible without
+Tuor wouldn't be possible without
 [Gondolin](https://github.com/earendil-works/gondolin) and
 [QEMU](https://www.qemu.org/), which do all the heavy lifting. Huge thanks to
 their maintainers!
