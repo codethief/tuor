@@ -97,6 +97,7 @@ directories (and so on), which in turn inherit from the global
     "MY_VAR": { "fromHost": "MY_VARIABLE" }  // Read from host env (different name)
     "EDITOR": { "fromHost": true },  // Read from host env (same var name)
     "AUTH_TOKEN": {
+      "secret": true,
       "fromHost": true,
       "hosts": ["my-api.hostname.com"]
     }
