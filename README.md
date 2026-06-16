@@ -6,22 +6,6 @@ and largely provides a convenience wrapper (config schema & lookup) and a few
 other niceties (overlayfs, hide specific files within mounts, Nix mode, etc.).
 
 
-## What is Tuor's raison d'être?
-There are relatively few agent sandboxing solutions out there that provide
-strong[^1] virtualization-based isolation (see "similar projects" below). Among
-those, I have really liked Gondolin but since it's mostly just an SDK, to me the
-final step – a good UI – was still missing. Tuor is trying to fill this gap.
-
-None of the features Tuor provides on top of Gondolin are particularly difficult
-to build. But they're still cumbersome if you (or everyone in your organization)
-need to build them every single time.
-
-
-## Project status
-Tuor is **experimental** and config schema and feature set might change at any
-time, while I'm still trying to figure out what works best for my own workflow.
-
-
 ## Features
 - **Isolation**: Strong[^1], microVM-based isolation between workload and host
   system using QEMU as hypervisor.
@@ -173,6 +157,22 @@ npm run lint
 npm run test
 npm run typecheck
 ```
+
+
+## Project status
+Tuor is **experimental** and config schema and feature set might change at any
+time, while I'm still trying to figure out what works best for my own workflow.
+
+
+## Yet another sandbox?
+There are relatively few agent sandboxing solutions out there that provide
+strong[^1] virtualization-based isolation (see "similar projects" below). Among
+those, I have really liked Gondolin but since it's mostly just an SDK, to me the
+final step – a good UI – was still missing. Tuor is trying to fill this gap.
+
+None of the features Tuor provides on top of Gondolin are particularly difficult
+to build. But they're still cumbersome if you (or everyone in your organization)
+need to build them every single time.
 
 
 ## Similar projects
