@@ -421,27 +421,23 @@ describe("_resolveEnv", () => {
     expect(env).toEqual({ FOO: "bar" });
   });
 
-  test("reads host var with fromHost: true using same key", () => {
+  test("uses explicit value verbatim without reading the host", () => {
     const { env } = _resolveEnv(
-      { EDITOR: { fromHost: true } },
-      { EDITOR: "vim" },
+      { EDITOR: { value: "vim" } },
+      { EDITOR: "should-be-ignored" },
       () => {},
     );
     expect(env).toEqual({ EDITOR: "vim" });
   });
 
-  test("reads host var with fromHost: string using different key", () => {
-    const { env } = _resolveEnv(
-      { DB_URL: { fromHost: "DATABASE_URL" } },
-      { DATABASE_URL: "postgres://..." },
-      () => {},
-    );
-    expect(env).toEqual({ DB_URL: "postgres://..." });
+  test("reads the host var named like the key when value is omitted", () => {
+    const { env } = _resolveEnv({ EDITOR: {} }, { EDITOR: "vim" }, () => {});
+    expect(env).toEqual({ EDITOR: "vim" });
   });
 
-  test("warns and skips when host var is missing", () => {
+  test("warns and skips when the host var is missing", () => {
     const warnings: string[] = [];
-    const { env } = _resolveEnv({ SECRET: { fromHost: true } }, {}, (msg) =>
+    const { env } = _resolveEnv({ SECRET: {} }, {}, (msg) =>
       warnings.push(msg),
     );
     expect(env).toEqual({});
@@ -449,40 +445,28 @@ describe("_resolveEnv", () => {
     expect(warnings[0]).toContain("SECRET");
   });
 
-  test("warns and skips when renamed host var is missing", () => {
-    const warnings: string[] = [];
-    const { env } = _resolveEnv(
-      { MY_VAR: { fromHost: "NONEXISTENT" } },
-      {},
-      (msg) => warnings.push(msg),
-    );
-    expect(env).toEqual({});
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain("NONEXISTENT");
-  });
-
   test("resolves mixed value types", () => {
     const { env } = _resolveEnv(
       {
         FIXED: "val",
-        FROM_HOST: { fromHost: true },
-        RENAMED: { fromHost: "SRC" },
+        FROM_HOST: {},
+        EXPLICIT: { value: "explicit" },
       },
-      { FROM_HOST: "hostval", SRC: "srcval" },
+      { FROM_HOST: "hostval" },
       () => {},
     );
     expect(env).toEqual({
       FIXED: "val",
       FROM_HOST: "hostval",
-      RENAMED: "srcval",
+      EXPLICIT: "explicit",
     });
   });
 
   test("partitions secrets from regular env vars", () => {
     const { env, secrets } = _resolveEnv(
       {
-        EDITOR: { fromHost: true },
-        API_KEY: { secret: true, fromHost: true, hosts: ["api.example.com"] },
+        EDITOR: {},
+        API_KEY: { secret: true, injectForHosts: ["api.example.com"] },
         FIXED: "value",
       },
       { EDITOR: "vim", API_KEY: "sk-123" },
@@ -494,27 +478,38 @@ describe("_resolveEnv", () => {
     });
   });
 
-  test("resolves secret with fromHost: string", () => {
+  test("reads a secret's value from the host var named like the key", () => {
     const { secrets } = _resolveEnv(
-      {
-        GH_TOKEN: {
-          secret: true,
-          fromHost: "GITHUB_TOKEN",
-          hosts: ["*.github.com"],
-        },
-      },
+      { GITHUB_TOKEN: { secret: true, injectForHosts: ["*.github.com"] } },
       { GITHUB_TOKEN: "ghp_abc" },
       () => {},
     );
     expect(secrets).toEqual({
-      GH_TOKEN: { hosts: ["*.github.com"], value: "ghp_abc" },
+      GITHUB_TOKEN: { hosts: ["*.github.com"], value: "ghp_abc" },
+    });
+  });
+
+  test("uses a secret's explicit value verbatim", () => {
+    const { secrets } = _resolveEnv(
+      {
+        GH_TOKEN: {
+          secret: true,
+          value: "ghp_explicit",
+          injectForHosts: ["*.github.com"],
+        },
+      },
+      {},
+      () => {},
+    );
+    expect(secrets).toEqual({
+      GH_TOKEN: { hosts: ["*.github.com"], value: "ghp_explicit" },
     });
   });
 
   test("warns and skips secret when host var is missing", () => {
     const warnings: string[] = [];
     const { secrets } = _resolveEnv(
-      { API_KEY: { secret: true, fromHost: true, hosts: ["api.example.com"] } },
+      { API_KEY: { secret: true, injectForHosts: ["api.example.com"] } },
       {},
       (msg) => warnings.push(msg),
     );
@@ -578,8 +573,8 @@ describe("resolveConfig env integration", () => {
     expect(spec.env!.MY_VAR).toBe("hello");
   });
 
-  test("resolves fromHost vars using deps.hostEnv", () => {
-    const spec = resolve({ env: { EDITOR: { fromHost: true } } }, "/cfg", {
+  test("reads host-sourced vars using deps.hostEnv", () => {
+    const spec = resolve({ env: { EDITOR: {} } }, "/cfg", {
       ...validDeps,
       hostEnv: { EDITOR: "vim" },
     });
@@ -590,8 +585,8 @@ describe("resolveConfig env integration", () => {
     const spec = resolve(
       {
         env: {
-          EDITOR: { fromHost: true },
-          API_KEY: { secret: true, fromHost: true, hosts: ["api.example.com"] },
+          EDITOR: {},
+          API_KEY: { secret: true, injectForHosts: ["api.example.com"] },
         },
       },
       "/cfg",

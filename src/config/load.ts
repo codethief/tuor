@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { SessionSpec } from "../core/session.ts";
+import { interpolateVars } from "./interpolate-vars.ts";
 import { findAllConfigDirs, mergeConfigs } from "./merge.ts";
 import { resolveConfig } from "./resolve.ts";
 import { parseConfig } from "./schema.ts";
@@ -28,9 +29,15 @@ export function loadConfig(): LoadedConfig {
     console.log(`Loading config: ${join(dir, "config.json")}`);
   }
 
+  // Interpolate $VAR / ${VAR} against the host env per layer (before parsing,
+  // so interpolated values are still schema-validated and every string value
+  // is covered).
   const layers = configDirs.map((dir) => ({
     config: parseConfig(
-      JSON.parse(readFileSync(join(dir, "config.json"), "utf-8")),
+      interpolateVars(
+        JSON.parse(readFileSync(join(dir, "config.json"), "utf-8")),
+        process.env,
+      ),
     ),
     configDir: dir,
   }));

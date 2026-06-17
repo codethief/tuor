@@ -65,27 +65,31 @@ const types = scope({
   // --------------------------------------------------------------------------
 
   /**
-   * Env var sourced from the host environment.
-   * - `{ fromHost: true }` reads the var with the same name from the host env
-   * - `{ fromHost: "OTHER_NAME" }` reads OTHER_NAME from the host env
+   * Env var sourced from the host or given an explicit value.
+   * - `value` omitted → read the host env var named like the (guest) key
+   * - `value` present → used as-is (already `$VAR`-interpolated at load time)
+   *
+   * (A bare string is the common shorthand for `{ value: "…" }`.)
    */
-  EnvValueFromHost: {
+  EnvFromHost: {
     "+": "reject",
-    fromHost: "string > 0 | true",
+    "value?": "string",
   },
   /**
    * Env var injected as a Gondolin secret: the guest sees a placeholder; the
-   * real value is substituted only in HTTP requests to the listed hosts.
+   * real value is substituted only in HTTP requests to `injectForHosts`.
+   * `value` is sourced as for {@link EnvFromHost} (omit it to read the host
+   * env var named like the key).
    */
   EnvSecret: {
     "+": "reject",
+    "value?": "string",
     secret: "true",
-    fromHost: "string > 0 | true",
     /** Host patterns allowed to receive this secret (wildcard supported). */
-    hosts: "string[] > 0",
+    injectForHosts: "string[] > 0",
   },
-  /** An env var value: literal, host-sourced, or a secret. */
-  EnvValue: "string | EnvValueFromHost | EnvSecret",
+  /** An env var value: a literal/interpolated string, host-sourced, or a secret. */
+  EnvValue: "string | EnvSecret | EnvFromHost",
 
   // --------------------------------------------------------------------------
   // Mounting & volumes, working directory
@@ -211,7 +215,7 @@ export type VolumeConfig = typeof types.VolumeConfig.infer;
 export type MountConfig = typeof types.MountConfig.infer;
 export type NixConfig = typeof types.NixConfig.infer;
 export type NetworkConfig = typeof types.NetworkConfig.infer;
-export type EnvValueFromHost = typeof types.EnvValueFromHost.infer;
+export type EnvFromHost = typeof types.EnvFromHost.infer;
 export type EnvSecret = typeof types.EnvSecret.infer;
 export type EnvValue = typeof types.EnvValue.infer;
 export type WorkdirConfig = typeof types.WorkdirConfig.infer;
