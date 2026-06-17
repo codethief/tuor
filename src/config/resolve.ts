@@ -167,21 +167,30 @@ export function _resolveEnv(
 
   for (const [key, value] of Object.entries(env)) {
     if (typeof value === "string") {
+      // User provided a literal value (already $VAR-interpolated) through
+      // shorthand.
       resolved[key] = value;
       continue;
     }
 
-    const hostKey = value.fromHost === true ? key : value.fromHost;
-    const hostValue = hostEnv[hostKey];
-    if (hostValue === undefined) {
-      warn(`env var "${key}": host variable "${hostKey}" is not set, skipping`);
-      continue;
+    let resolvedValue: string;
+    if (value.value !== undefined) {
+      // User provided a literal value (already $VAR-interpolated)
+      resolvedValue = value.value;
+    } else {
+      // No value provided => read from host env var of the same name.
+      const hostValue = hostEnv[key];
+      if (hostValue === undefined) {
+        warn(`env var "${key}": host variable "${key}" is not set, skipping`);
+        continue;
+      }
+      resolvedValue = hostValue;
     }
 
     if ("secret" in value) {
-      secrets[key] = { hosts: value.hosts, value: hostValue };
+      secrets[key] = { hosts: value.injectForHosts, value: resolvedValue };
     } else {
-      resolved[key] = hostValue;
+      resolved[key] = resolvedValue;
     }
   }
 

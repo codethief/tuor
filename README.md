@@ -94,12 +94,20 @@ directories (and so on), which in turn inherit from the global
   },
   "env": {
     "SOME_VAR": "fixed_value",  // Literal value
-    "MY_VAR": { "fromHost": "MY_VARIABLE" }  // Read from host env (different name)
-    "EDITOR": { "fromHost": true },  // Read from host env (same var name)
+    "MY_VAR": "${MY_VARIABLE}_and_a_suffix",  // ${MY_VARIABLE} is interpolated from the host env
+    "EDITOR": {},  // Read host var named like the key (i.e. $EDITOR)
     "AUTH_TOKEN": {
+      // Injected as a secret: the guest sees a placeholder; the real value
+      // (host's $AUTH_TOKEN here, since `value` field is omitted) is substituted only
+      // in HTTPS requests to these hosts.
       "secret": true,
-      "fromHost": true,
-      "hosts": ["my-api.hostname.com"]
+      "injectForHosts": ["my-api.hostname.com"]
+    },
+    "GH_TOKEN": {
+      // A secret whose value comes from a differently-named host var:
+      "secret": true,
+      "value": "$GITHUB_TOKEN",
+      "injectForHosts": ["*.github.com"]
     }
   },
   "mounts": [

@@ -202,15 +202,17 @@ describe("mergeConfigs", () => {
     test("secrets merge like other env values", () => {
       const result = mergeConfigs([
         layer("/a", {
-          env: { KEY: { secret: true, fromHost: true, hosts: ["a.com"] } },
+          env: { KEY: { secret: true, injectForHosts: ["a.com"] } },
         }),
         layer("/b", {
-          env: { OTHER: { secret: true, fromHost: "X", hosts: ["b.com"] } },
+          env: {
+            OTHER: { secret: true, value: "$X", injectForHosts: ["b.com"] },
+          },
         }),
       ]);
       expect(result.env).toEqual({
-        KEY: { secret: true, fromHost: true, hosts: ["a.com"] },
-        OTHER: { secret: true, fromHost: "X", hosts: ["b.com"] },
+        KEY: { secret: true, injectForHosts: ["a.com"] },
+        OTHER: { secret: true, value: "$X", injectForHosts: ["b.com"] },
       });
     });
 

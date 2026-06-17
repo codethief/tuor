@@ -135,75 +135,73 @@ describe("parseConfig", () => {
     expect(config.env).toEqual({ MY_VAR: "hello" });
   });
 
-  test("accepts env with fromHost: true", () => {
-    const config = parseConfig({ env: { EDITOR: { fromHost: true } } });
-    expect(config.env).toEqual({ EDITOR: { fromHost: true } });
+  test("accepts env with an explicit value", () => {
+    const config = parseConfig({ env: { EDITOR: { value: "vim" } } });
+    expect(config.env).toEqual({ EDITOR: { value: "vim" } });
   });
 
-  test("accepts env with fromHost: string", () => {
-    const config = parseConfig({
-      env: { DB_URL: { fromHost: "DATABASE_URL" } },
-    });
-    expect(config.env).toEqual({ DB_URL: { fromHost: "DATABASE_URL" } });
+  test("accepts env with an empty object (host var by key name)", () => {
+    const config = parseConfig({ env: { EDITOR: {} } });
+    expect(config.env).toEqual({ EDITOR: {} });
   });
 
   test("accepts env with mixed value types", () => {
     const config = parseConfig({
       env: {
         FIXED: "value",
-        FROM_HOST: { fromHost: true },
-        RENAMED: { fromHost: "OTHER" },
+        FROM_HOST: {},
+        EXPLICIT: { value: "$OTHER" },
       },
     });
     expect(config.env).toEqual({
       FIXED: "value",
-      FROM_HOST: { fromHost: true },
-      RENAMED: { fromHost: "OTHER" },
+      FROM_HOST: {},
+      EXPLICIT: { value: "$OTHER" },
     });
   });
 
-  test("accepts env with secret (fromHost: true)", () => {
+  test("accepts env with secret sourced from host by key name", () => {
     const config = parseConfig({
       env: {
-        API_KEY: { secret: true, fromHost: true, hosts: ["api.example.com"] },
+        API_KEY: { secret: true, injectForHosts: ["api.example.com"] },
       },
     });
     expect(config.env).toEqual({
-      API_KEY: { secret: true, fromHost: true, hosts: ["api.example.com"] },
+      API_KEY: { secret: true, injectForHosts: ["api.example.com"] },
     });
   });
 
-  test("accepts env with secret (fromHost: string)", () => {
+  test("accepts env with secret given an explicit value", () => {
     const config = parseConfig({
       env: {
         GH_TOKEN: {
           secret: true,
-          fromHost: "GITHUB_TOKEN",
-          hosts: ["*.github.com"],
+          value: "$GITHUB_TOKEN",
+          injectForHosts: ["*.github.com"],
         },
       },
     });
     expect(config.env).toEqual({
       GH_TOKEN: {
         secret: true,
-        fromHost: "GITHUB_TOKEN",
-        hosts: ["*.github.com"],
+        value: "$GITHUB_TOKEN",
+        injectForHosts: ["*.github.com"],
       },
     });
   });
 
-  test("accepts env mixing literals, fromHost, and secrets", () => {
+  test("accepts env mixing literals, host-sourced vars, and secrets", () => {
     const config = parseConfig({
       env: {
         FIXED: "value",
-        EDITOR: { fromHost: true },
-        API_KEY: { secret: true, fromHost: true, hosts: ["api.example.com"] },
+        EDITOR: {},
+        API_KEY: { secret: true, injectForHosts: ["api.example.com"] },
       },
     });
     expect(config.env).toEqual({
       FIXED: "value",
-      EDITOR: { fromHost: true },
-      API_KEY: { secret: true, fromHost: true, hosts: ["api.example.com"] },
+      EDITOR: {},
+      API_KEY: { secret: true, injectForHosts: ["api.example.com"] },
     });
   });
 
@@ -319,15 +317,21 @@ describe("parseConfig", () => {
     ],
     ["non-object input", "not an object"],
     ["empty ignore array", { mounts: [{ hostPath: "/x", ignore: [] }] }],
-    ["env with fromHost: number", { env: { X: { fromHost: 123 } } }],
-    ["env with fromHost: empty string", { env: { X: { fromHost: "" } } }],
+    ["env with non-string value", { env: { X: { value: 123 } } }],
     ["env with unknown source key", { env: { X: { badKey: true } } }],
-    ["secret without hosts", { env: { X: { secret: true, fromHost: true } } }],
     [
-      "secret with empty hosts",
-      { env: { X: { secret: true, fromHost: true, hosts: [] } } },
+      "injectForHosts without secret",
+      { env: { X: { injectForHosts: ["h"] } } },
     ],
-    ["secret without fromHost", { env: { X: { secret: true, hosts: ["h"] } } }],
+    ["secret without injectForHosts", { env: { X: { secret: true } } }],
+    [
+      "secret with empty injectForHosts",
+      { env: { X: { secret: true, injectForHosts: [] } } },
+    ],
+    [
+      "secret: false (only literal true accepted)",
+      { env: { X: { secret: false, injectForHosts: ["h"] } } },
+    ],
   ])("rejects %s", (_label, raw) => {
     expect(() => parseConfig(raw)).toThrow();
   });
