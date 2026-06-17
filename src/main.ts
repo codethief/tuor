@@ -2,9 +2,10 @@
 import { buildApplication, buildRouteMap, run } from "@stricli/core";
 import { command as init } from "./cli/init.ts";
 import { command as run_ } from "./cli/run.ts";
+import { command as showConfig } from "./cli/show-config.ts";
 
 const root = buildRouteMap({
-  routes: { init, run: run_ },
+  routes: { init, run: run_, showConfig },
   docs: { brief: "CLI for sandboxing coding agents and other dev tools" },
 });
 

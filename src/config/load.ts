@@ -26,7 +26,9 @@ export function loadConfig(): LoadedConfig {
   }
 
   for (const dir of configDirs) {
-    console.log(`Loading config: ${join(dir, "config.json")}`);
+    // Informational, not data: keep it off stdout so commands like
+    // `show-config` can emit clean, pipeable output.
+    console.error(`Loading config: ${join(dir, "config.json")}`);
   }
 
   // Interpolate $VAR / ${VAR} against the host env per layer (before parsing,
