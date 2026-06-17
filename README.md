@@ -59,8 +59,9 @@ tuor run -- echo "hi"  # Spawn VM and run custom command
 ```
 
 
-## Documentation
+## Further reading & documentation
 - [Configuration](./docs/Configuration.md)
+- [Development](./docs/Development.md)
 
 
 ## Security & threat model
@@ -68,25 +69,6 @@ tuor run -- echo "hi"  # Spawn VM and run custom command
 - Since Tuor is a relatively thin wrapper around Gondolin, it follows the same
   [architecture](https://earendil-works.github.io/gondolin/architecture/) and
   [threat model](https://github.com/earendil-works/gondolin/security).
-
-
-## Development
-We use [mise](https://mise.jdx.dev) for the bootstrap. Once mise is installed, do:
-
-```
-mise install
-npm install
-```
-
-Available commands (compare `package.json`):
-
-```shell
-npm run start  # Fire up Tuor right from the source code (without building)
-npm run build  # Build for release
-npm run lint
-npm run test
-npm run typecheck
-```
 
 
 ## Project status
