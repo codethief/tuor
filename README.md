@@ -7,12 +7,16 @@ other niceties (overlayfs, hide specific files within mounts, Nix mode, etc.).
 
 
 ## Features
-- **Isolation**: Strong[^1], microVM-based isolation between workload and host
-  system using QEMU as hypervisor.
-- **Persistence**: VM disk images are treated as disposable and will be deleted
-  upon VM shutdown. To persist data, create a volume or mount host directories
-  into the guest – either as read-only, read/write, or using an overlay file system
-  (guest may write but host files stay unchanged).
+- **Isolation**: [Strong](./docs/FAQ.md), virtualization-based isolation between
+  workload and host system using QEMU as hypervisor with heavily constrained
+  guest ↔ host communication [thanks to
+  Gondolin](https://earendil-works.github.io/gondolin/architecture/).
+- **Ephemeral**: VM disk images are copy-on-write and treated as disposable
+  (will be deleted upon VM shutdown).
+- **Virtual file system mounts**: To persist data, create a volume or mount host
+  directories into the guest – either as read-only, read/write, or using an
+  (experimental) overlay file system (guest may write but host files stay
+  unchanged).
 - **Hide host files**: Within a mounted directory, hide select files (e.g.
   `.envrc` files with credentials) from the VM guest.
 - **Network control**: Restrict network access to HTTP and specific hosts. DNS
@@ -24,44 +28,36 @@ other niceties (overlayfs, hide specific files within mounts, Nix mode, etc.).
   VM.
 - **File-based configuration**: Easily fine-tune your VM configuration on a
   project-by-project or folder-by-folder basis, while defining global defaults
-  in `~/.config/tuor/config.json`.
+  in `~/.config/tuor/config.json` or local defaults in a parent folder.
 - **Rootfs**: (Soon) Configure the VM's rootfs by providing an OCI container
   image. Currently, the VM's base image & kernel are based on
   `alpine-base:latest`.
 - **Convenience mode for NixOS users**: Have Tuor mount Nix store & related
   dirs into the VM, set up PATH & other env vars, etc.
-- **Platform support**: Should run on both Linux and MacOS. ("should" because I
-  can only test on Linux. Feel free to report bugs!)
-- **VM nesting**: Run inside existing VMs, even when KVM is not available.
-  (Thanks, QEMU!)
+- **Platform support**: Should run on Linux/WSL/MacOS. ("should" because I can
+  only test on Linux. Feel free to report bugs!)
 
-Again, most of these features are already provided by
-[Gondolin](https://github.com/earendil-works/gondolin) – I am merely listing
-them here for completeness.
+Again, most of these features are provided by
+[Gondolin](https://github.com/earendil-works/gondolin) and I don't want to take
+credit for them – just listing them here for completeness.
 
 
-## Getting started & usage
-### Requirements:
-- QEMU (`qemu-system-arm` on Debian/Ubuntu, `qemu` on MacOS (Brew))
-- Node.js (as this is what Gondolin provides the API in)
+## Quick start
+Using NPM's `npx`:
 
-
-### Installation:
 ```shell
-npm install -g tuor-sandbox
+npx tuor-sandbox run  # Spawns VM and starts interactive shell
 ```
 
-### Commands:
-```shell
-tuor init  # Create default config in ./.tuor/, which is also where VM state (overlays, volumes) will be stored
-tuor run  # Spawn VM with interactive shell, based on config in nearest .tuor directory
-tuor run -- echo "hi"  # Spawn VM and run custom command
-```
+Run `npx tuor-sandbox --help` to explore the CLI.
 
 
 ## Further reading & documentation
+- [Installation](./docs/Installation.md)
+- [CLI](./docs/CLI.md)
 - [Configuration](./docs/Configuration.md)
 - [Development](./docs/Development.md)
+- [FAQ](./docs/FAQ.md)
 
 
 ## Security & threat model
@@ -76,27 +72,12 @@ Tuor is **experimental** and config schema and feature set might change at any
 time, while I'm still trying to figure out what works best for my own workflow.
 
 
-## Yet another sandbox?
-There are relatively few agent sandboxing solutions out there that provide
-strong[^1] virtualization-based isolation (see "similar projects" below). Among
-those, I have really liked Gondolin but since it's mostly just an SDK, to me the
-final step – a good UI – was still missing. Tuor is trying to fill this gap.
-
-None of the features Tuor provides on top of Gondolin are particularly difficult
-to build. But they're still cumbersome if you (or everyone in your organization)
-need to build them every single time.
-
-
 ## Similar projects
 Other sandboxes I am aware of that provide comparable features & security
-guarantees[^1]:
+guarantees:
 - [Alibaba OpenSandbox](https://github.com/alibaba/OpenSandbox/)
 - [Docker Sandbox](https://docs.docker.com/ai/sandboxes/)
 - [Matchlock](https://github.com/jingkaihe/matchlock)
-
-[^1]: Host kernel-based mechanisms for workload isolation such as landlock and
-    Linux namespaces (e.g. Docker containers) are just not enough. Agents are
-    getting too good at writing kernel exploits.
 
 
 ## Acknowledgements
