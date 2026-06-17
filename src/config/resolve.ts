@@ -6,14 +6,10 @@ import type {
   VolumeSpec,
 } from "../core/mounts.ts";
 import { validateMounts } from "../core/mounts.ts";
-import type {
-  NetworkSpec,
-  QemuSpec,
-  SecretSpec,
-  SessionSpec,
-} from "../core/session.ts";
+import type { QemuSpec, SecretSpec, SessionSpec } from "../core/session.ts";
 import type { ScopedPattern } from "../core/shadow.ts";
-import { expandTilde, inferGuestHomeDir } from "./homedir.ts";
+import type { DefaultedConfig } from "./defaults.ts";
+import { expandTilde } from "./homedir.ts";
 import {
   collectIgnorePatterns,
   DEFAULT_IGNORE_FILE_REFS,
@@ -43,13 +39,20 @@ export type ResolveDeps = {
 
 // --- Public API ---
 
-export function resolveConfig(
-  config: TuorConfig,
+/**
+ * Convert an already-defaulted config into the `SessionSpec` that `run` boots a
+ * VM from. This is pure *structural conversion* (path expansion, env/secret
+ * split, nix→mounts, computed overlay dirs) plus filesystem validation — all
+ * config-level defaults are expected to be filled in already (see
+ * {@link applyConfigDefaults}).
+ */
+export function createSessionSpecFromConfig(
+  config: DefaultedConfig,
   configDir: string,
   hostHomeDir: string,
   deps: ResolveDeps = defaultResolveDeps,
 ): SessionSpec {
-  const guestHomeDir = config.guestHomeDir ?? inferGuestHomeDir(config.user);
+  const guestHomeDir = config.guestHomeDir;
 
   // Resolve workdir
   const { guestWorkdir, workdirMount } = resolveWorkdir(
@@ -99,14 +102,12 @@ export function resolveConfig(
   const hasEnv = Object.keys(mergedEnv).length > 0;
   const hasSecrets = Object.keys(secrets).length > 0;
 
-  const network = resolveNetwork(config.network);
-
   const qemu = resolveQemu(config.qemu);
 
   return {
     user: config.user,
     workdir: guestWorkdir,
-    network,
+    network: config.network,
     mounts: allMounts,
     ...(volumes.length > 0 ? { volumes } : {}),
     ...(config.rootfsSize ? { rootfsSize: config.rootfsSize } : {}),
@@ -228,20 +229,6 @@ function resolveWorkdir(
     guestWorkdir,
     workdirMount: workdir,
   };
-}
-
-function resolveNetwork(network: TuorConfig["network"]): NetworkSpec {
-  if (!network) {
-    return { mode: "restricted", allowedHosts: [], allowedInternalHosts: [] };
-  } else if (network.mode === "open") {
-    return network;
-  } else {
-    return {
-      mode: "restricted",
-      allowedHosts: network.allowedHosts ?? [],
-      allowedInternalHosts: network.allowedInternalHosts ?? [],
-    };
-  }
 }
 
 /**

@@ -1,11 +1,12 @@
 import { describe, expect, test } from "vitest";
+import { applyConfigDefaults } from "./defaults.ts";
 import type { IgnoreFileDeps } from "./ignore-files.ts";
 import type { NixDeps } from "./nix.ts";
 import {
   _getOverlayStateDir,
   _resolveEnv,
+  createSessionSpecFromConfig,
   type ResolveDeps,
-  resolveConfig,
 } from "./resolve.ts";
 import type { TuorConfig } from "./schema.ts";
 
@@ -33,10 +34,15 @@ function resolve(
   deps = validDeps,
 ) {
   const full: TuorConfig = { user: "root", workdir: "/", ...config };
-  return resolveConfig(full, configDir, HOST_HOME, deps);
+  return createSessionSpecFromConfig(
+    applyConfigDefaults(full),
+    configDir,
+    HOST_HOME,
+    deps,
+  );
 }
 
-describe("resolveConfig", () => {
+describe("createSessionSpecFromConfig", () => {
   describe("mount resolution", () => {
     test("resolves relative hostPath against configDir", () => {
       const spec = resolve({
@@ -552,7 +558,7 @@ describe("_resolveEnv", () => {
   });
 });
 
-describe("resolveConfig env integration", () => {
+describe("createSessionSpecFromConfig env integration", () => {
   test("omits env when not configured and no nix", () => {
     const spec = resolve({});
     expect(spec.env).toBeUndefined();

@@ -1,5 +1,5 @@
 import { buildCommand } from "@stricli/core";
-import { loadConfig } from "../config/load.ts";
+import { loadSessionSpec } from "../config/load.ts";
 import { runSession } from "../core/session.ts";
 
 type Flags = {
@@ -8,7 +8,7 @@ type Flags = {
 
 export const command = buildCommand({
   func: async (flags: Flags, ...args: string[]) => {
-    const { spec } = loadConfig();
+    const { spec } = loadSessionSpec();
 
     if (flags.dangerouslyOpenNetwork) {
       spec.network = { mode: "open" };
