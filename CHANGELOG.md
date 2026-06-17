@@ -2,6 +2,7 @@
 
 ## Features
 - Add new `--version` CLI flag
+- Add new `show-config` CLI command
 
 
 # 0.2.1 (2026-06-23)

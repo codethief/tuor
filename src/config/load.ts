@@ -2,21 +2,29 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { SessionSpec } from "../core/session.ts";
+import { applyConfigDefaults, type DefaultedConfig } from "./defaults.ts";
 import { interpolateVars } from "./interpolate-vars.ts";
 import { findAllConfigDirs, mergeConfigs } from "./merge.ts";
-import { resolveConfig } from "./resolve.ts";
+import { createSessionSpecFromConfig } from "./resolve.ts";
 import { parseConfig } from "./schema.ts";
 
-export type LoadedConfig = {
+export type LoadedEffectiveConfig = {
+  config: DefaultedConfig;
+  closestConfigDir: string;
+};
+
+export type LoadedSessionSpec = {
   spec: SessionSpec;
   closestConfigDir: string;
 };
 
 /**
- * Discover, parse, merge, and resolve Tuor configuration.
- * Exits the process if no config is found.
+ * Discover, parse, merge, and default Tuor configuration into the effective
+ * config a user reasons about (same shape as `config.json`, defaults filled).
+ * This is the artifact `show-config` prints. Exits the process if no config is
+ * found.
  */
-export function loadConfig(): LoadedConfig {
+export function loadEffectiveConfig(): LoadedEffectiveConfig {
   const configDirs = findAllConfigDirs(process.cwd(), homedir());
   if (configDirs.length === 0) {
     console.error(
@@ -26,7 +34,9 @@ export function loadConfig(): LoadedConfig {
   }
 
   for (const dir of configDirs) {
-    console.log(`Loading config: ${join(dir, "config.json")}`);
+    // Informational, not data: keep it off stdout so commands like
+    // `show-config` can emit clean, pipeable output.
+    console.error(`Loading config: ${join(dir, "config.json")}`);
   }
 
   // Interpolate $VAR / ${VAR} against the host env per layer (before parsing,
@@ -41,9 +51,18 @@ export function loadConfig(): LoadedConfig {
     ),
     configDir: dir,
   }));
-  const config = mergeConfigs(layers);
+  const merged = mergeConfigs(layers);
   const closestConfigDir = configDirs[configDirs.length - 1]!;
-  const spec = resolveConfig(config, closestConfigDir, homedir());
 
+  return { config: applyConfigDefaults(merged), closestConfigDir };
+}
+
+/**
+ * Load the effective config and convert it into the `SessionSpec` that `run`
+ * boots a VM from.
+ */
+export function loadSessionSpec(): LoadedSessionSpec {
+  const { config, closestConfigDir } = loadEffectiveConfig();
+  const spec = createSessionSpecFromConfig(config, closestConfigDir, homedir());
   return { spec, closestConfigDir };
 }
