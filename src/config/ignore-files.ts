@@ -7,6 +7,7 @@ import {
 } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import type { ScopedPattern } from "../core/shadow.ts";
+import { getStateDir } from "./state-dir.ts";
 
 // --- Types ---
 
@@ -22,8 +23,15 @@ export const DEFAULT_IGNORE_FILE_REFS = [
 export type IgnoreFileDeps = {
   readFile: (path: string) => string;
   pathExists: (path: string) => boolean;
-  /** Find all files named `filename` under `rootDir`, returning absolute paths. */
-  walkFiles: (rootDir: string, filename: string) => string[];
+  /**
+   * Find all files named `filename` under `rootDir`, returning absolute paths.
+   * Directories whose absolute path is in `excludeDirs` are not descended into.
+   */
+  walkFiles: (
+    rootDir: string,
+    filename: string,
+    excludeDirs: ReadonlySet<string>,
+  ) => string[];
 };
 
 export function parseIgnoreFileRef(ref: string): IgnoreFileRef {
@@ -72,6 +80,11 @@ export function collectIgnorePatterns(
 ): ScopedPattern[] {
   const result: ScopedPattern[] = [];
 
+  // Never scan Tuor's own state dir: it holds serialized overlay upper layers
+  // (whiteout markers, plus symlinks whose targets only resolve inside the
+  // sandbox), which is internal state, not user content.
+  const excludeDirs = new Set([getStateDir(configDir)]);
+
   for (const ref of refs) {
     switch (ref.source) {
       case "host": {
@@ -88,7 +101,11 @@ export function collectIgnorePatterns(
       }
       case "mount": {
         if (ref.recursive) {
-          for (const absPath of deps.walkFiles(hostPath, ref.path)) {
+          for (const absPath of deps.walkFiles(
+            hostPath,
+            ref.path,
+            excludeDirs,
+          )) {
             const dir = relative(hostPath, dirname(absPath));
             const scope = dir === "" ? "/" : `/${dir}`;
             result.push(
@@ -125,11 +142,16 @@ export function _parseIgnoreFile(contents: string): string[] {
 
 // --- Default deps (real filesystem) ---
 
-function walkFilesRecursive(rootDir: string, filename: string): string[] {
+function walkFilesRecursive(
+  rootDir: string,
+  filename: string,
+  excludeDirs: ReadonlySet<string> = new Set(),
+): string[] {
   const results: string[] = [];
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = join(dir, entry.name);
+      if (excludeDirs.has(full)) continue;
       if (entry.isSymbolicLink()) {
         // statSync follows the link to its target. A dangling symlink (target
         // missing) throws ENOENT, so guard against it and skip rather than

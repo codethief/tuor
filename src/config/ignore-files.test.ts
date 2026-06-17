@@ -254,6 +254,32 @@ describe("collectIgnorePatterns", () => {
     }
   });
 
+  test("does not scan Tuor's own state dir during recursive walk", () => {
+    const root = mkdtempSync(join(tmpdir(), "tuor-statedir-"));
+    try {
+      // A user ignore file at the mount root that must still be collected.
+      writeFileSync(join(root, ".tuorignore"), "user-pattern");
+
+      // Tuor persists overlay upper layers under <configDir>/.state. It is
+      // internal state, not user content, so an ignore file inside it must NOT
+      // be collected: the walk must not descend into the state dir at all.
+      const stateOverlay = join(root, ".tuor", ".state", "overlays", "root");
+      mkdirSync(stateOverlay, { recursive: true });
+      writeFileSync(join(stateOverlay, ".tuorignore"), "internal-pattern");
+
+      const refs = [parseIgnoreFileRef("mount:.tuorignore")];
+      const result = collectIgnorePatterns(
+        refs,
+        root,
+        join(root, ".tuor"),
+        defaultIgnoreFileDeps,
+      );
+      expect(result).toEqual([{ pattern: "user-pattern", scope: "/" }]);
+    } finally {
+      rmSync(root, { recursive: true });
+    }
+  });
+
   test("merges patterns from multiple refs", () => {
     const deps: IgnoreFileDeps = {
       readFile: (p) => {
