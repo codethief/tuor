@@ -24,6 +24,7 @@ import type {
   VolumeConfig,
   WorkdirConfig,
 } from "./schema.ts";
+import { getOverlaysDir } from "./state-dir.ts";
 
 // --- Types ---
 
@@ -254,7 +255,7 @@ export function _getOverlayStateDir(
 ): string {
   const stripped = guestPath.replace(/^\//, "");
   const sanitized = stripped === "" ? "_root" : stripped.replace(/\//g, "_");
-  return join(configDir, ".state", "overlays", sanitized);
+  return join(getOverlaysDir(configDir), sanitized);
 }
 
 // --- Default deps ---

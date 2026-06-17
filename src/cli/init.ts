@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildCommand, type CommandContext } from "@stricli/core";
 import type { TuorConfig } from "../config/schema.ts";
+import { STATE_DIR_NAME } from "../config/state-dir.ts";
 import { MOUNT_MODES, type MountMode } from "../core/mounts.ts";
 
 type Flags = {
@@ -44,7 +45,7 @@ export const command = buildCommand({
       join(tuorDir, "config.json"),
       JSON.stringify(config, null, 2) + "\n",
     );
-    writeFileSync(join(tuorDir, ".gitignore"), ".state\n");
+    writeFileSync(join(tuorDir, ".gitignore"), `${STATE_DIR_NAME}\n`);
     writeFileSync(
       join(tuorDir, "tuorignore"),
       [
