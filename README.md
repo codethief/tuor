@@ -59,78 +59,8 @@ tuor run -- echo "hi"  # Spawn VM and run custom command
 ```
 
 
-## Example `config.json`
-Place this in a `.tuor/` folder in your project directory or in
-`~/.config/tuor/`. (Configs in child directories inherit from configs in parent
-directories (and so on), which in turn inherit from the global
-`~/.config/tuor/config.json`.)
-
-```javascript
-{
-  "network": {
-    // "open" for unrestricted access, "restricted" for allowlist
-    "mode": "restricted",
-    // Allow HTTPS traffic to these hosts
-    "allowedHosts": ["*.github.com", "api.anthropic.com"],
-    // Like allowedHosts but for hosts pointing at private IPs (which are
-    // otherwise blocked to prevent DNS rebinding attacks)
-    "allowedInternalHosts": ["local-llm.my.corp"]
-  },
-  "env": {
-    "SOME_VAR": "fixed_value",  // Literal value
-    "MY_VAR": "${MY_VARIABLE}_and_a_suffix",  // ${MY_VARIABLE} is interpolated from the host env
-    "EDITOR": {},  // Read host var named like the key (i.e. $EDITOR)
-    "AUTH_TOKEN": {
-      // Injected as a secret: the guest sees a placeholder; the real value
-      // (host's $AUTH_TOKEN here, since `value` field is omitted) is substituted only
-      // in HTTPS requests to these hosts.
-      "secret": true,
-      "injectForHosts": ["my-api.hostname.com"]
-    },
-    "GH_TOKEN": {
-      // A secret whose value comes from a differently-named host var:
-      "secret": true,
-      "value": "$GITHUB_TOKEN",
-      "injectForHosts": ["*.github.com"]
-    }
-  },
-  "mounts": [
-    {
-      // Absolute or relative to config.json
-      "hostPath": "/path/on/the/host",
-      // Can be omitted, in which case guestPath will be set to the resolved
-      // (absolute) hostPath.
-      "guestPath": "/path/on/the/guest",
-      // Will do copy-on-write and persist changes to .tuor/.state/overlays/
-      "mode": "overlay",
-      // Optional: Explicit paths to hide from the guest
-      "ignore": [".env", "secret.key", ".tuor"],
-      // Files to read list of ignored files from (think .gitignore). Paths are
-      // either host paths or mount-relative paths.
-      "ignoreFileRefs": ["host:./tuorignore", "mount:.tuorignore"]
-    }
-  ],
-  // Minimum virtual disk size (COW overlay, so actual host usage stays
-  // sparse). Note that the virtual disk will be discarded on VM shutdown,
-  // so it is not meant for persisting data across VM boots. (Use mounts &
-  // volumes, instead!)
-  "rootfsSize": "2G",
-  // Constraint: Guest user must currently be root
-  "user": "root",
-  // Persistent guest directories without a host backing directory (
-  // similar to Docker volumes)
-  "volumes": [
-    { "guestPath": "~/.claude" }  // Persist Claude Code state
-  ],
-  // Instead of a string (guest path) you can also provide a mount config here
-  // for convenience, e.g.
-  // { hostPath: "..", guestPath: "/workspace", mode: "readwrite" }
-  "workdir": "/workspace"
-}
-```
-
-For a detailed description of all config options, please see
-[`src/config/schema.ts`](./src/config/schema.ts).
+## Documentation
+- [Configuration](./docs/Configuration.md)
 
 
 ## Security & threat model
