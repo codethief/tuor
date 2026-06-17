@@ -232,6 +232,28 @@ describe("collectIgnorePatterns", () => {
     }
   });
 
+  test("skips dangling symlinks instead of crashing the walk", () => {
+    const root = mkdtempSync(join(tmpdir(), "tuor-dangling-"));
+    try {
+      // A real ignore file that must still be found despite the bad symlink.
+      writeFileSync(join(root, ".tuorignore"), "secret");
+      // A symlink whose target does not exist. statSync (which follows the
+      // link) throws ENOENT on it; the walk must skip it, not crash.
+      symlinkSync(join(root, "does-not-exist"), join(root, "dangling"));
+
+      const refs = [parseIgnoreFileRef("mount:.tuorignore")];
+      const result = collectIgnorePatterns(
+        refs,
+        root,
+        "/cfg",
+        defaultIgnoreFileDeps,
+      );
+      expect(result).toEqual([{ pattern: "secret", scope: "/" }]);
+    } finally {
+      rmSync(root, { recursive: true });
+    }
+  });
+
   test("merges patterns from multiple refs", () => {
     const deps: IgnoreFileDeps = {
       readFile: (p) => {

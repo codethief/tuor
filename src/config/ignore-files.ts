@@ -131,7 +131,16 @@ function walkFilesRecursive(rootDir: string, filename: string): string[] {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = join(dir, entry.name);
       if (entry.isSymbolicLink()) {
-        if (!statSync(full).isDirectory()) continue;
+        // statSync follows the link to its target. A dangling symlink (target
+        // missing) throws ENOENT, so guard against it and skip rather than
+        // letting one broken link crash the entire walk.
+        let isDir: boolean;
+        try {
+          isDir = statSync(full).isDirectory();
+        } catch {
+          continue;
+        }
+        if (!isDir) continue;
         const real = realpathSync(full);
         if (dir.startsWith(real + "/") || dir === real) {
           throw new Error(
