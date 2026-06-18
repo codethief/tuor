@@ -1,45 +1,53 @@
 # Tuor – strong sandboxing for AI agents
-Tuor is a command line tool to spawn microVM-based sandboxes that you can run
-your coding agent or other workloads in. Under the hood, Tuor uses the excellent
-[Gondolin](https://github.com/earendil-works/gondolin) for the actual sandbox
-and largely provides a convenience wrapper (config schema & lookup) and a few
-other niceties (overlayfs, hide specific files within mounts, Nix mode, etc.).
+Tuor is a convenience wrapper around
+[Gondolin](https://github.com/earendil-works/gondolin) to spawn microVM-based
+sandboxes that you can run your coding agent or other workloads in. It exposes
+most of Gondolin's features through a JSON config schema and makes them
+configurable on a folder-by-folder, project-by-project basis.
 
 
 ## Features
+Tuor exposes a wide number of Gondolin's features:
+
 - **Isolation**: [Strong](./docs/FAQ.md), virtualization-based isolation between
   workload and host system using QEMU as hypervisor with heavily constrained
-  guest ↔ host communication [thanks to
-  Gondolin](https://earendil-works.github.io/gondolin/architecture/).
+  guest ↔ host communication.
 - **Ephemeral**: VM disk images are copy-on-write and treated as disposable
   (will be deleted upon VM shutdown).
-- **Virtual file system mounts**: To persist data, create a volume or mount host
-  directories into the guest – either as read-only, read/write, or using an
-  (experimental) overlay file system (guest may write but host files stay
-  unchanged).
+- **Virtual file system mounts**: To persist data, mount host directories into
+  the guest (read-only or read/write).
 - **Hide host files**: Within a mounted directory, hide select files (e.g.
   `.envrc` files with credentials) from the VM guest.
-- **Network control**: Restrict network access to HTTP and specific hosts. DNS
+- **Network control**: Restrict network egress to HTTP and specific hosts. DNS
   is provided by the sandbox, so as to prevent data exfiltration through UDP 53.
 - **Secret injection**: Prevent the guest from seeing your auth tokens &
-  secrets, by having Tuor inject them into HTTP requests as the latter leave the
-  sandbox.
+  secrets, by injecting them into HTTP requests as the latter leave the sandbox.
 - **Env vars**: Control which environment variables get passed through to the
   VM.
-- **File-based configuration**: Easily fine-tune your VM configuration on a
-  project-by-project or folder-by-folder basis, while defining global defaults
-  in `~/.config/tuor/config.json` or local defaults in a parent folder.
 - **Rootfs**: (Soon) Configure the VM's rootfs by providing an OCI container
   image. Currently, the VM's base image & kernel are based on
-  `alpine-base:latest`.
+  `alpine-base:latest` (Gondolin's default).
+- **Platform independent**: Runs on Linux/MacOS/WSL.
+
+…and adds the following convenience features:
+
+- **File-based configuration**: Easily fine-tune your VM configuration on a
+  project-by-project or folder-by-folder basis, while defining local defaults
+  further up the directory tree and/or defining global defaults in
+  `~/.config/tuor/config.json`.
+- **Volumes**: Instead of mounting an existing host directory like your
+  workspace, mount a "volume" – similarly to a Docker volume. Useful for
+  persisting guest directories across VM restarts. (E.g. persist the home dir
+  and thereby shell history, agent conversations, …)
+- **Overlay mounts (experimental)**: Define overlay mounts, whose (read-only)
+  lower layer is a host directory and whose (writable) upper layer is persisted
+  across VM restarts. In other words: The guest may write to the mount but host
+  files stay unchanged.
+- **Ignore files (experimental)**: Similarly to a `.gitignore` file, use a
+  `.tuorignore` file to hide files within a mount from the guest. (No glob
+  support yet, though.)
 - **Convenience mode for NixOS users**: Have Tuor mount Nix store & related
   dirs into the VM, set up PATH & other env vars, etc.
-- **Platform support**: Should run on Linux/WSL/MacOS. ("should" because I can
-  only test on Linux. Feel free to report bugs!)
-
-Again, most of these features are provided by
-[Gondolin](https://github.com/earendil-works/gondolin) and I don't want to take
-credit for them – just listing them here for completeness.
 
 
 ## Quick start
@@ -68,8 +76,9 @@ Run `npx tuor-sandbox --help` to explore the CLI.
 
 
 ## Project status
-Tuor is **experimental** and config schema and feature set might change at any
-time, while I'm still trying to figure out what works best for my own workflow.
+Tuor is in its **early alpha** stages and should be considered (very)
+experimental. Config schema and feature set might change at any time while I'm
+still trying to figure out what works best for my own workflow.
 
 
 ## Similar projects
