@@ -35,6 +35,12 @@ const types = scope({
     "nix?": "NixConfig",
 
     /**
+     * Low-level QEMU tuning (accel/cpu/machine type). Mainly useful to speed up
+     * software emulation when the host has no KVM — see QemuConfig.
+     */
+    "qemu?": "QemuConfig",
+
+    /**
      * Minimum virtual disk size for the rootfs (e.g. "2G", "512M").
      * The COW overlay will be grown to at least this size before boot.
      * Actual host disk usage remains sparse (only written pages cost space).
@@ -209,11 +215,41 @@ const types = scope({
      */
     nixLd: "boolean = false",
   },
+
+  // --------------------------------------------------------------------------
+  // QEMU tuning
+  // --------------------------------------------------------------------------
+
+  /**
+   * QEMU knobs, forwarded verbatim to Gondolin's
+   * `sandbox.{accel,cpu,machineType}`. Any field left unset falls back to
+   * Gondolin's own auto-selection (which already detects /dev/kvm and picks kvm
+   * vs. software emulation accordingly). We ship no defaults of our own.
+   *
+   * In case of software emulation (tcg), it might be worth increasing QEMU's
+   * host-side translation block cache (tb-size) by setting e.g.
+   * ```
+   * accel: "tcg,tb-size=1024"
+   * ```
+   */
+  QemuConfig: {
+    "+": "reject",
+    /**
+     * QEMU `-accel` string, including sub-options, e.g.
+     * "tcg,tb-size=1024" or "kvm".
+     */
+    "accel?": "string > 0",
+    /** QEMU `-cpu` model, e.g. "host", "max", "qemu64". */
+    "cpu?": "string > 0",
+    /** QEMU `-machine` type, e.g. "q35", "microvm", "virt". */
+    "machineType?": "string > 0",
+  },
 }).export();
 
 export type VolumeConfig = typeof types.VolumeConfig.infer;
 export type MountConfig = typeof types.MountConfig.infer;
 export type NixConfig = typeof types.NixConfig.infer;
+export type QemuConfig = typeof types.QemuConfig.infer;
 export type NetworkConfig = typeof types.NetworkConfig.infer;
 export type EnvFromHost = typeof types.EnvFromHost.infer;
 export type EnvSecret = typeof types.EnvSecret.infer;
