@@ -1,4 +1,4 @@
-import { createHttpHooks, VM } from "@earendil-works/gondolin";
+import { createHttpHooks, VM, type VMOptions } from "@earendil-works/gondolin";
 import {
   buildVfsMounts,
   buildVfsVolumes,
@@ -21,6 +21,17 @@ export type NetworkSpec =
       allowedInternalHosts: string[];
     };
 
+/**
+ * Resolved QEMU tuning for the single acceleration mode selected at config
+ * resolution time (see resolve.ts). Fields map verbatim to Gondolin's
+ * `sandbox.{accel,cpu,machineType}`.
+ */
+export type QemuSpec = {
+  accel?: string;
+  cpu?: string;
+  machineType?: string;
+};
+
 /** Core's top-level input contract — everything the session needs to run. */
 export type SessionSpec = {
   user: string;
@@ -31,6 +42,7 @@ export type SessionSpec = {
   rootfsSize?: string;
   env?: Record<string, string>;
   secrets?: Record<string, SecretSpec>;
+  qemu?: QemuSpec;
 };
 
 // --- Public API ---
@@ -63,6 +75,7 @@ export async function runSession(
     ...(spec.rootfsSize ? { rootfs: { size: spec.rootfsSize } } : {}),
     ...(hasEnv ? { env: mergedEnv } : {}),
     ...(hasVfsMounts ? { vfs: { mounts: vfsMounts } } : {}),
+    sandbox: spec.qemu,
   });
 
   if (command) {

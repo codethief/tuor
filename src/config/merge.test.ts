@@ -367,6 +367,29 @@ describe("mergeConfigs", () => {
     });
   });
 
+  describe("qemu: shallow field merge", () => {
+    test("child field overrides parent, others preserved", () => {
+      const result = mergeConfigs([
+        layer("/a", { qemu: { accel: "tcg", cpu: "max" } }),
+        layer("/b", { qemu: { cpu: "qemu64" } }),
+      ]);
+      expect(result.qemu).toEqual({ accel: "tcg", cpu: "qemu64" });
+    });
+
+    test("parent qemu used when child has none", () => {
+      const result = mergeConfigs([
+        layer("/a", { qemu: { accel: "tcg,tb-size=1024" } }),
+        layer("/b"),
+      ]);
+      expect(result.qemu).toEqual({ accel: "tcg,tb-size=1024" });
+    });
+
+    test("no qemu when neither layer has it", () => {
+      const result = mergeConfigs([layer("/a"), layer("/b")]);
+      expect(result.qemu).toBeUndefined();
+    });
+  });
+
   describe("three-level merge", () => {
     test("most specific wins for scalars, arrays concatenate across all layers", () => {
       const result = mergeConfigs([

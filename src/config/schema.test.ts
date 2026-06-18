@@ -296,7 +296,37 @@ describe("parseConfig", () => {
     });
   });
 
+  describe("qemu config", () => {
+    test("accepts accel, cpu and machineType", () => {
+      const config = parseConfig({
+        qemu: {
+          accel: "tcg,tb-size=1024",
+          cpu: "qemu64",
+          machineType: "q35",
+        },
+      });
+      expect(config.qemu).toEqual({
+        accel: "tcg,tb-size=1024",
+        cpu: "qemu64",
+        machineType: "q35",
+      });
+    });
+
+    test("accepts a partial config", () => {
+      const config = parseConfig({ qemu: { accel: "tcg,tb-size=1024" } });
+      expect(config.qemu).toEqual({ accel: "tcg,tb-size=1024" });
+    });
+
+    test("omits qemu when not specified", () => {
+      const config = parseConfig({});
+      expect(config.qemu).toBeUndefined();
+    });
+  });
+
   test.each([
+    ["qemu unknown field", { qemu: { foo: "bar" } }],
+    ["qemu empty accel", { qemu: { accel: "" } }],
+    ["qemu non-string cpu", { qemu: { cpu: 42 } }],
     [
       "relative guestPath",
       { mounts: [{ hostPath: "/foo", guestPath: "rel" }] },

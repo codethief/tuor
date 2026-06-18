@@ -1,7 +1,12 @@
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { DEFAULT_IGNORE_FILE_REFS } from "./ignore-files.ts";
-import type { MountConfig, NetworkConfig, TuorConfig } from "./schema.ts";
+import type {
+  MountConfig,
+  NetworkConfig,
+  QemuConfig,
+  TuorConfig,
+} from "./schema.ts";
 
 // --- Types ---
 
@@ -88,6 +93,9 @@ function mergeTwoConfigs(parent: TuorConfig, child: TuorConfig): TuorConfig {
     ...lastDefined(child.rootfsSize, parent.rootfsSize, "rootfsSize"),
     ...lastDefined(child.nix, parent.nix, "nix"),
 
+    // Qemu: deep-merge each variant, child field wins
+    ...mergeQemu(parent.qemu, child.qemu),
+
     // Arrays: concatenate
     ...mergeArrayField(parent.mounts, child.mounts, "mounts"),
     ...mergeArrayField(parent.volumes, child.volumes, "volumes"),
@@ -157,6 +165,15 @@ function mergeNetwork(
       ),
     },
   };
+}
+
+function mergeQemu(
+  parentQemu: QemuConfig | undefined,
+  childQemu: QemuConfig | undefined,
+): { qemu: QemuConfig } | Record<string, never> {
+  if (!parentQemu && !childQemu) return {} as Record<string, never>;
+  // Shallow merge: each field (accel/cpu/machineType) is a scalar, child wins.
+  return { qemu: { ...parentQemu, ...childQemu } };
 }
 
 function mergeStringArrayField<K extends string>(

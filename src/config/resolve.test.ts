@@ -413,6 +413,34 @@ describe("resolveConfig", () => {
       expect(spec.mounts[0]!.guestPath).toBe("/custom/home/data");
     });
   });
+
+  describe("qemu resolution", () => {
+    test("omits qemu when nothing is configured", () => {
+      const spec = resolve({});
+      expect(spec.qemu).toBeUndefined();
+    });
+
+    test("passes the qemu config through verbatim", () => {
+      const spec = resolve({
+        qemu: { accel: "tcg,tb-size=1024", cpu: "qemu64", machineType: "q35" },
+      });
+      expect(spec.qemu).toEqual({
+        accel: "tcg,tb-size=1024",
+        cpu: "qemu64",
+        machineType: "q35",
+      });
+    });
+
+    test("passes a partial qemu config through", () => {
+      const spec = resolve({ qemu: { accel: "tcg,tb-size=1024" } });
+      expect(spec.qemu).toEqual({ accel: "tcg,tb-size=1024" });
+    });
+
+    test("treats an empty qemu config as unset", () => {
+      const spec = resolve({ qemu: {} });
+      expect(spec.qemu).toBeUndefined();
+    });
+  });
 });
 
 describe("_resolveEnv", () => {

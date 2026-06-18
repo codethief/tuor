@@ -6,7 +6,12 @@ import type {
   VolumeSpec,
 } from "../core/mounts.ts";
 import { validateMounts } from "../core/mounts.ts";
-import type { NetworkSpec, SecretSpec, SessionSpec } from "../core/session.ts";
+import type {
+  NetworkSpec,
+  QemuSpec,
+  SecretSpec,
+  SessionSpec,
+} from "../core/session.ts";
 import type { ScopedPattern } from "../core/shadow.ts";
 import { expandTilde, inferGuestHomeDir } from "./homedir.ts";
 import {
@@ -96,6 +101,8 @@ export function resolveConfig(
 
   const network = resolveNetwork(config.network);
 
+  const qemu = resolveQemu(config.qemu);
+
   return {
     user: config.user,
     workdir: guestWorkdir,
@@ -105,6 +112,7 @@ export function resolveConfig(
     ...(config.rootfsSize ? { rootfsSize: config.rootfsSize } : {}),
     ...(hasEnv ? { env: mergedEnv } : {}),
     ...(hasSecrets ? { secrets } : {}),
+    ...(qemu ? { qemu } : {}),
   };
 }
 
@@ -234,6 +242,17 @@ function resolveNetwork(network: TuorConfig["network"]): NetworkSpec {
       allowedInternalHosts: network.allowedInternalHosts ?? [],
     };
   }
+}
+
+/**
+ * Pass the configured QEMU knobs through verbatim. We ship no defaults: any
+ * field left unset falls back to Gondolin's own auto-selection (which detects
+ * /dev/kvm and picks kvm/host/microvm, or max/q35 under software emulation).
+ * Returns undefined when nothing is configured.
+ */
+function resolveQemu(qemu: TuorConfig["qemu"]): QemuSpec | undefined {
+  if (!qemu || Object.keys(qemu).length === 0) return undefined;
+  return { ...qemu };
 }
 
 function resolveVolumeConfig(
