@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { extractReleaseNotes, rollUnreleasedSection } from "./changelog.ts";
+import {
+  extractReleaseDate,
+  extractReleaseNotes,
+  rollUnreleasedSection,
+} from "./changelog.ts";
 
 const SAMPLE = `# Unreleased
 
@@ -75,6 +79,16 @@ describe("extractReleaseNotes", () => {
   test("throws when the version section body is empty", () => {
     const emptyBody = "# 0.2.0 (2026-06-20)\n\n# 0.1.0 (2026-06-15)\nstuff\n";
     expect(() => extractReleaseNotes(emptyBody, "0.2.0")).toThrow(/empty/i);
+  });
+});
+
+describe("extractReleaseDate", () => {
+  test("returns the date from the version heading", () => {
+    expect(extractReleaseDate(SAMPLE, "0.1.0")).toBe("2026-06-15");
+  });
+
+  test("throws when the version heading is absent", () => {
+    expect(() => extractReleaseDate(SAMPLE, "9.9.9")).toThrow(/no .*9\.9\.9/i);
   });
 });
 

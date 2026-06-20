@@ -92,3 +92,20 @@ export function extractReleaseNotes(content: string, version: string): string {
   }
   return notes;
 }
+
+/**
+ * Returns the date recorded in the `# ${version} (${date})` heading (verbatim, as
+ * written by `rollUnreleasedSection`). Throws if there is no such dated heading. Used to
+ * build the GitHub Release title, so it matches the changelog rather than drifting to
+ * the (possibly later) release date.
+ */
+export function extractReleaseDate(content: string, version: string): string {
+  const heading = new RegExp(`^# ${escapeRegExp(version)} \\(([^)]+)\\)`, "m");
+  const match = heading.exec(content);
+  if (match?.[1] === undefined) {
+    throw new Error(
+      `No \`# ${version} (DATE)\` heading found in the changelog.`,
+    );
+  }
+  return match[1];
+}
