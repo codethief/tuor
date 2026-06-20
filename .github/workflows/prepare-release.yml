@@ -1,7 +1,10 @@
 name: Prepare release
 
-# Manually-triggered release prep. Bumps the version, rolls the CHANGELOG, and opens a
-# PR — nothing is pushed to master directly. Merging the PR triggers release.yml.
+# Manually-triggered release prep. Bumps the version, rolls the CHANGELOG, and pushes a
+# `release/vX` branch — nothing is pushed to master directly. It then prints a one-click
+# "open PR" link to the job summary (we intentionally don't have the bot create the PR, so
+# the repo's "Allow GitHub Actions to create and approve pull requests" toggle can stay
+# off). You open the PR and merge it; merging triggers release.yml.
 on:
   workflow_dispatch:
     inputs:
@@ -25,8 +28,7 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # push the release branch
-      pull-requests: write # open the PR
+      contents: write # push the release branch (no pull-requests: write — we don't create the PR)
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -38,7 +40,7 @@ jobs:
       - run: ./scripts/check-version-increases.ts "$VERSION"
       - run: ./scripts/roll-changelog.ts "$VERSION"
       - run: npm version "$VERSION" --no-git-tag-version
-      - name: Commit on a branch and open PR
+      - name: Commit on a branch and print the PR link
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -52,6 +54,15 @@ jobs:
           git -c credential.helper= \
               -c credential.helper='!f() { echo username=x-access-token; echo "password=${GH_TOKEN}"; }; f' \
               push "https://github.com/${{ github.repository }}.git" "$BRANCH"
-          gh pr create --base master --head "$BRANCH" \
-            --title "Release v${VERSION}" \
-            --body "Automated release prep for v${VERSION}. Review the version bump and rolled CHANGELOG, then merge to trigger the gated release."
+          # We don't create the PR (keeps the bot from needing PR-create/approve rights).
+          # Print a pre-filled compare link instead; ?expand=1 opens the PR form with the
+          # commit subject ("Release vX") as the default title. github.repository is the
+          # repo slug (not attacker-controlled), so expanding it here is injection-safe.
+          PR_URL="https://github.com/${{ github.repository }}/compare/master...${BRANCH}?expand=1"
+          {
+            echo "## Release prep for v${VERSION} is ready"
+            echo ""
+            echo "Branch \`${BRANCH}\` pushed. [**Open the release PR →**](${PR_URL})"
+            echo ""
+            echo "Review the version bump and rolled CHANGELOG, then merge to trigger the gated release."
+          } >> "$GITHUB_STEP_SUMMARY"
