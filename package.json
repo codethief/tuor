@@ -20,13 +20,15 @@
   "scripts": {
     "start": "./src/main.ts",
     "build": "tsdown",
-    "test": "vitest run src/",
-    "typecheck": "tsc --noEmit",
-    "lint": "biome check src/"
+    "test": "vitest run src/ scripts/",
+    "typecheck": "tsc --build",
+    "lint": "biome check src/ scripts/"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
     "@types/node": "^22",
+    "@types/semver": "^7.7.1",
+    "semver": "^7.8.5",
     "tsdown": "^0.22.2",
     "typescript": "^6",
     "vitest": "^4.1.8"

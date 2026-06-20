@@ -1,0 +1,57 @@
+name: Prepare release
+
+# Manually-triggered release prep. Bumps the version, rolls the CHANGELOG, and opens a
+# PR — nothing is pushed to master directly. Merging the PR triggers release.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Target version, e.g. 0.2.0 (must be > current package.json version)"
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+# Injection-safety: the free-text `version` input is bound ONCE here; every step below
+# references the quoted shell variable "$VERSION" and never expands ${{ inputs.version }}
+# inside a `run:` script (which Actions would substitute before the shell parses it).
+env:
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the release branch
+      pull-requests: write # open the PR
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
+        with:
+          cache: true
+      - run: npm ci
+      - run: ./scripts/check-version-increases.ts "$VERSION"
+      - run: ./scripts/roll-changelog.ts "$VERSION"
+      - run: npm version "$VERSION" --no-git-tag-version
+      - name: Commit on a branch and open PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BRANCH="release/v${VERSION}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$BRANCH"
+          git commit package.json package-lock.json CHANGELOG.md -m "Release v${VERSION}"
+          # Credential helper reads the token from env at git runtime — token never lands
+          # in argv (URL) or on-disk git config. Leading empty helper clears inherited ones.
+          git -c credential.helper= \
+              -c credential.helper='!f() { echo username=x-access-token; echo "password=${GH_TOKEN}"; }; f' \
+              push "https://github.com/${{ github.repository }}.git" "$BRANCH"
+          gh pr create --base master --head "$BRANCH" \
+            --title "Release v${VERSION}" \
+            --body "Automated release prep for v${VERSION}. Review the version bump and rolled CHANGELOG, then merge to trigger the gated release."

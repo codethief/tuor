@@ -1,0 +1,121 @@
+name: Release
+
+# Triggered after CI succeeds on a push to master (i.e. after a release-prep PR merges).
+# A cheap, ungated `gate` job decides whether this push introduced a new version; only
+# then does the `release` job — behind a manual approval environment — tag, build, create
+# the GitHub Release, and publish to npm via OIDC.
+#
+# zizmor flags `workflow_run` as a dangerous trigger because it runs privileged and is
+# commonly misused to execute untrusted PR code. We use it safely: the gate requires a
+# *push* to *master* that *succeeded*, the checkout pins the triggering commit SHA (a
+# trusted master commit, never PR head), and the privileged publish sits behind a manual
+# approval environment. Hence the suppression below.
+on: # zizmor: ignore[dangerous-triggers]
+  workflow_run:
+    workflows: ["CI"] # matches name: in ci.yml
+    types: [completed]
+    branches: [master] # head branch of the CI run; excludes PR runs at the trigger
+
+permissions: {}
+
+# NOTE: no workflow-level `concurrency:` on purpose. A top-level group would put
+# every release RUN — including the ones that no-op at the gate — into one
+# serialized slot, and GitHub cancels the older *pending* run whenever a newer
+# one queues. Under a quick succession of merges A -> B -C where only A bumps
+# the version, B/C's no-op runs could evict A while it waits, so nothing
+# releases. Concurrency lives on the `release` job instead (below), where only
+# genuine releases land.
+
+jobs:
+  gate:
+    # Belt-and-suspenders: the trigger's `branches: [master]` already excludes PR runs;
+    # this also requires the CI run to be a *push* that *succeeded*.
+    if: >-
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'master' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # workflow_run defaults to default-branch HEAD — must pin the triggering SHA.
+      # fetch-depth: 2 so the first parent is present for the version-introduced diff.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
+        with:
+          cache: true
+      - run: npm ci
+      - id: decide
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          ./scripts/validate-version.ts "$VERSION"   # format check (defence-in-depth)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # Release ONLY when THIS commit introduced the version (vs its first
+          # parent), not merely whenever master happens to carry an untagged
+          # version. This ties the release to the prepare commit and makes any
+          # later same-version commit a no-op regardless of CI/approval
+          # ordering.
+          # HEAD^ = first parent, so this covers both squash and merge-commit merges.
+          git show "HEAD^:package.json" > /tmp/package.parent.json
+          PARENT_VERSION=$(node -p "require('/tmp/package.parent.json').version")
+
+          if [ "$VERSION" != "$PARENT_VERSION" ]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          fi
+    outputs:
+      should_release: ${{ steps.decide.outputs.should_release }}
+      version: ${{ steps.decide.outputs.version }}
+      sha: ${{ github.event.workflow_run.head_sha }}
+
+
+  release:
+    needs: gate
+    if: needs.gate.outputs.should_release == 'true'
+    name: Create git tag & GitHub Release, publish to npm
+    runs-on: ubuntu-latest
+    environment: tag-release-and-publish # <- MANUAL APPROVAL GATE (required reviewer)
+    timeout-minutes: 15 # bound a hung job holding id-token: write
+    # Serialize on the VERSION — the resource that actually needs mutual exclusion (it owns
+    # the v$VERSION tag, the GitHub Release, and the npm version). Job-level concurrency can
+    # read `needs.*` (it's evaluated after `gate`), unlike top-level concurrency. Keying by
+    # version (not SHA) collapses two commits that target the SAME version (e.g. a bump, a
+    # revert, then a re-bump) into one serialized slot with a single approval.
+    concurrency:
+      group: release-${{ needs.gate.outputs.version }}
+      cancel-in-progress: false
+    permissions:
+      contents: write # create the Github release (and its tag)
+      id-token: write # OIDC trusted publishing
+    env:
+      VERSION: ${{ needs.gate.outputs.version }} # from package.json, bound once
+      SHA: ${{ needs.gate.outputs.sha }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+          persist-credentials: false
+      - uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
+        with:
+          cache: true
+      - run: npm ci
+      - run: ./scripts/extract-notes.ts "$VERSION" /tmp/release-notes.md
+      - run: npm run build
+      - name: Create GitHub release (which creates the tag), then publish to npm
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TARBALL=$(npm pack | tail -n1)
+          # --target makes GitHub create the v$VERSION tag on the release commit as part of
+          # creating the release — tag and release are born together from one API call, so
+          # there's no separate git tag/push and no credential-helper dance. Release is
+          # created before publish (publish is the least-reversible step).
+          gh release create "v${VERSION}" --target "$SHA" --title "v${VERSION}" \
+            --notes-file /tmp/release-notes.md "$TARBALL"
+          npm publish "$TARBALL"  # OIDC: no token, provenance automatic; same artifact attached above
