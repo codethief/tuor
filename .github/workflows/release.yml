@@ -91,7 +91,7 @@ jobs:
       group: release-${{ needs.gate.outputs.version }}
       cancel-in-progress: false
     permissions:
-      contents: write # create the Github release (and its tag)
+      contents: write # create the Github Release (and its tag)
       id-token: write # OIDC trusted publishing
     env:
       VERSION: ${{ needs.gate.outputs.version }} # from package.json, bound once
@@ -107,15 +107,18 @@ jobs:
       - run: npm ci
       - run: ./scripts/extract-notes.ts "$VERSION" /tmp/release-notes.md
       - run: npm run build
-      - name: Create GitHub release (which creates the tag), then publish to npm
+      - name: Create GitHub Release (which creates the tag), then publish to npm
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TARBALL=$(npm pack | tail -n1)
+          # Title uses the date from the CHANGELOG heading (not "today"), so it matches the
+          # changelog even though the manual approval may land days after prepare.
+          DATE=$(./scripts/extract-release-date.ts "$VERSION")
           # --target makes GitHub create the v$VERSION tag on the release commit as part of
-          # creating the release — tag and release are born together from one API call, so
+          # creating the Release — tag and Release are born together from one API call, so
           # there's no separate git tag/push and no credential-helper dance. Release is
           # created before publish (publish is the least-reversible step).
-          gh release create "v${VERSION}" --target "$SHA" --title "v${VERSION}" \
+          gh release create "v${VERSION}" --target "$SHA" --title "Tuor v${VERSION} (${DATE})" \
             --notes-file /tmp/release-notes.md "$TARBALL"
           npm publish "$TARBALL"  # OIDC: no token, provenance automatic; same artifact attached above
