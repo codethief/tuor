@@ -1,0 +1,6 @@
+{
+  // Release/dev helper scripts. Fully isolated from `src/`: no reference to the src
+  // project, so scripts can never leak into the shipped bundle and vice versa.
+  "extends": "./tsconfig.base.json",
+  "include": ["scripts"]
+}

@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    // Environment setup & latest features
+    "lib": ["ESNext"],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleDetection": "force",
+    "allowJs": true,
+
+    // Bundler mode
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+
+    // Settings to make tsconfig project references work.
+    "composite": true,
+    "emitDeclarationOnly": true,  // Required by `composite: true`, compare https://github.com/microsoft/TypeScript/issues/49844#issuecomment-1180758551
+    "outDir": "node_modules/.cache/tsc",
+
+    // Best practices
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["@types/node"],
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+
+    // Some stricter flags (disabled by default)
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noPropertyAccessFromIndexSignature": false,
+
+    // https://nodejs.org/en/learn/typescript/run-natively
+    "erasableSyntaxOnly": true
+  }
+}
