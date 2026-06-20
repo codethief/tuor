@@ -1,5 +1,8 @@
 # Unreleased
 
+
+# 0.2.0 (2026-06-20)
+
 ## Features
 - Config: interpolate host environment variables (`$VAR` / `${VAR}`, `$$` for a
   literal `$`) into any config string value. Enables e.g. mounting `$PWD`.
