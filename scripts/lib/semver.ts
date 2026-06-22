@@ -23,8 +23,6 @@ export function assertValid(version: string): string {
  * version, so this is what actually blocks downgrades.
  */
 export function assertGreater(current: string, next: string): void {
-  assertValid(current);
-  assertValid(next);
   if (!semver.gt(next, current)) {
     throw new Error(
       `Target version ${next} must be strictly greater than the current version ${current}.`,
