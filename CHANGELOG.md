@@ -1,6 +1,13 @@
 # Unreleased
 
 
+# 0.2.1 (2026-06-23)
+
+## Bug fixes
+- `package.json`: Add missing `repository.url` to meet NPM's provenance
+  requirements.
+
+
 # 0.2.0 (2026-06-22)
 
 ## Features
