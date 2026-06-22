@@ -12,6 +12,7 @@ permissions: {}
 
 jobs:
   checks:
+    name: Master pipeline checks
     uses: ./.github/workflows/checks.yml
     permissions: # ceiling for the called jobs (union of what they each need)
       contents: read

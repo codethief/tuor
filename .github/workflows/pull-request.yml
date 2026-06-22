@@ -9,6 +9,10 @@ permissions: {}
 
 jobs:
   checks:
+    name: PR pipeline checks
+    # ^This is the name of the job (or rather: the name prefix of the checks.yml
+    # jobs) we require in the master branch protection ruleset to pass before a
+    # PR can be merged.
     uses: ./.github/workflows/checks.yml
     permissions: # ceiling for the called jobs (union of what they each need)
       contents: read
