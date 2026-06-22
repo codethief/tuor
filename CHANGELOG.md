@@ -1,12 +1,17 @@
 # Unreleased
 
+
+# 0.2.0 (2026-06-22)
+
 ## Features
-- Config: interpolate host environment variables (`$VAR` / `${VAR}`, `$$` for a
+- Config: Interpolate host environment variables (`$VAR` / `${VAR}`, `$$` for a
   literal `$`) into any config string value. Enables e.g. mounting `$PWD`.
-- Config: simplified the `env` schema. Removed `fromHost`; an env var is now a
+- Config: Simplified the `env` schema. Removed `fromHost`; an env var is now a
   literal string (`$VAR`-interpolated) or an object 
   `{ value?, secret?, injectForHosts? }`, where an omitted `value` reads the 
   host var named like the key. Secrets use `injectForHosts` (was `hosts`).
+- Config: Expose QEMU settings as config options.
+- Add `/docs` folder with preliminary documentation.
 
 
 ## Bug fixes
@@ -17,6 +22,12 @@
   (`.tuor/.state`), which holds internal overlay data rather than user content.
   Persisted overlays can contain dangling symlinks there, so this is also what
   triggered the crash above on subsequent starts. The state dir is now skipped.
+- Bump undici version to fix upstream CVE.
+
+
+## Internal
+- Release automation: Add `prepare-release.ts` and set up GitHub Actions
+  workflow to release & publish.
 
 
 # 0.1.0 (2026-06-15)
