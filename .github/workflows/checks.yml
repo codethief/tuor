@@ -9,6 +9,9 @@ on:
 permissions: {}
 
 jobs:
+  # Note: When changing job names here or adding/removing jobs, the master
+  # branch protection ruleset on Github must be adapted (i.e. which jobs need to
+  # pass for a PR to be able to be merged).
   check:
     name: Typecheck, test, lint, build
     runs-on: ubuntu-latest
