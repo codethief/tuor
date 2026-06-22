@@ -1,0 +1,16 @@
+name: Pull request
+
+# PR pipeline: run the shared checks on every pull request. Nothing release-related lives
+# here — that belongs to master.yml.
+on:
+  pull_request:
+
+permissions: {}
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+    permissions: # ceiling for the called jobs (union of what they each need)
+      contents: read
+      actions: read
+      security-events: write

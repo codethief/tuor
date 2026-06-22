@@ -1,9 +1,10 @@
-name: CI
+name: Checks
 
+# Reusable suite of gating checks, called by both pull-request.yml (PRs) and master.yml
+# (pushes to master). Kept as a `workflow_call` workflow — rather than a composite action —
+# so the three checks stay separate parallel jobs with their own minimal permissions.
 on:
-  push:
-    branches: [master]
-  pull_request:
+  workflow_call: {}
 
 permissions: {}
 

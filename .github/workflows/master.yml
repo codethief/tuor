@@ -1,0 +1,49 @@
+name: Master
+
+# Master pipeline: run the shared checks on every push to master, and — only once they're
+# green — decide whether this commit bumped the package.json version and, if so, dispatch
+# release.yml. The version-changed decision lives here (not in release.yml) so the Release
+# workflow only ever runs for an actual release instead of firing on every commit.
+on:
+  push:
+    branches: [master]
+
+permissions: {}
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+    permissions: # ceiling for the called jobs (union of what they each need)
+      contents: read
+      actions: read
+      security-events: write
+
+  trigger-release:
+    needs: checks # only on green master
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # read package.json and its first parent
+      actions: write # dispatch release.yml (workflow_dispatch)
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 2 # need HEAD^ to diff package.json against the first parent
+          persist-credentials: false
+      - name: Dispatch release.yml when the version changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Release ONLY when THIS commit introduced the version (vs its first
+          # parent), not whenever master merely carries an untagged version.
+          # HEAD^ = first parent, so this covers both squash and merge-commit
+          # merges of the prepare PR. release.yml reads the version itself; we
+          # only hand it the commit to release.
+          VERSION=$(jq -r .version package.json)
+          git show "HEAD^:package.json" > /tmp/package.parent.json
+          PARENT_VERSION=$(jq -r .version /tmp/package.parent.json)
+          if [ "$VERSION" = "$PARENT_VERSION" ]; then
+            echo "Version unchanged ($VERSION) — no release."
+            exit 0
+          fi
+          echo "Version bumped $PARENT_VERSION -> $VERSION — dispatching release for $GITHUB_SHA."
+          gh workflow run release.yml --ref master -f sha="$GITHUB_SHA"
