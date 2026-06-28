@@ -1,5 +1,8 @@
 # Unreleased
 
+## Features
+- Add new `--version` CLI flag
+
 
 # 0.2.1 (2026-06-23)
 
@@ -14,8 +17,8 @@
 - Config: Interpolate host environment variables (`$VAR` / `${VAR}`, `$$` for a
   literal `$`) into any config string value. Enables e.g. mounting `$PWD`.
 - Config: Simplified the `env` schema. Removed `fromHost`; an env var is now a
-  literal string (`$VAR`-interpolated) or an object 
-  `{ value?, secret?, injectForHosts? }`, where an omitted `value` reads the 
+  literal string (`$VAR`-interpolated) or an object
+  `{ value?, secret?, injectForHosts? }`, where an omitted `value` reads the
   host var named like the key. Secrets use `injectForHosts` (was `hosts`).
 - Config: Expose QEMU settings as config options.
 - Add `/docs` folder with preliminary documentation.
