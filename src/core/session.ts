@@ -1,4 +1,4 @@
-import { createHttpHooks, VM, type VMOptions } from "@earendil-works/gondolin";
+import { createHttpHooks, VM } from "@earendil-works/gondolin";
 import {
   buildVfsMounts,
   buildVfsVolumes,
