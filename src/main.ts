@@ -1,5 +1,6 @@
 #!/usr/bin/env -S node --disable-warning=ExperimentalWarning
 import { buildApplication, buildRouteMap, run } from "@stricli/core";
+import packagejson from "../package.json" with { type: "json" };
 import { command as init } from "./cli/init.ts";
 import { command as run_ } from "./cli/run.ts";
 
@@ -10,6 +11,7 @@ const root = buildRouteMap({
 
 const app = buildApplication(root, {
   name: "tuor",
+  versionInfo: { currentVersion: packagejson.version },
   scanner: {
     caseStyle: "allow-kebab-for-camel",
     allowArgumentEscapeSequence: true,
