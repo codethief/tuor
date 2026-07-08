@@ -1,5 +1,8 @@
 # Unreleased
 
+
+# 0.3.1 (2026-07-08)
+
 ## Bug fixes
 - Config: a child config layer (e.g. a project `.tuor/config.json`) that didn't
   set `workdir` or `user` silently reset the value inherited from an upper layer
