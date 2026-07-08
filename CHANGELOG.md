@@ -1,5 +1,8 @@
 # Unreleased
 
+
+# 0.3.0 (2026-07-08)
+
 ## Features
 - Add new `--version` CLI flag
 - Add new `show-config` CLI command
