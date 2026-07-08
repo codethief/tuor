@@ -86,9 +86,13 @@ export function mergeConfigs(layers: ConfigLayer[]): TuorConfig {
 /** Merge two configs where `child` overrides `parent`. */
 function mergeTwoConfigs(parent: TuorConfig, child: TuorConfig): TuorConfig {
   return {
-    // Scalars: child wins (fall back to parent for defaults)
-    user: child.user,
-    workdir: child.workdir,
+    // Scalars: child wins, falling back to parent when the child omits the
+    // field. user/workdir carry no schema default anymore, so "omitted" is
+    // genuinely undefined here — otherwise a child layer's silently-defaulted
+    // value would clobber a value inherited from a parent layer. Their defaults
+    // are applied post-merge in applyConfigDefaults.
+    ...lastDefined(child.user, parent.user, "user"),
+    ...lastDefined(child.workdir, parent.workdir, "workdir"),
     ...lastDefined(child.guestHomeDir, parent.guestHomeDir, "guestHomeDir"),
     ...lastDefined(child.rootfsSize, parent.rootfsSize, "rootfsSize"),
     ...lastDefined(child.nix, parent.nix, "nix"),

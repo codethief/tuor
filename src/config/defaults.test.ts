@@ -2,11 +2,37 @@ import { describe, expect, test } from "vitest";
 import { applyConfigDefaults } from "./defaults.ts";
 import type { TuorConfig } from "./schema.ts";
 
+/**
+ * A merged config as it reaches applyConfigDefaults: user/workdir are optional
+ * (no schema default) and only present when a layer set them explicitly.
+ */
 function config(overrides: Partial<TuorConfig> = {}): TuorConfig {
-  return { user: "root", workdir: "/", ...overrides };
+  return { ...overrides };
 }
 
 describe("applyConfigDefaults", () => {
+  describe("user / workdir", () => {
+    test("defaults user to root when omitted", () => {
+      expect(applyConfigDefaults(config()).user).toBe("root");
+    });
+
+    test("defaults workdir to / when omitted", () => {
+      expect(applyConfigDefaults(config()).workdir).toBe("/");
+    });
+
+    test("preserves an explicit user and workdir", () => {
+      const result = applyConfigDefaults(
+        config({ user: "dev", workdir: "/w" }),
+      );
+      expect(result.user).toBe("dev");
+      expect(result.workdir).toBe("/w");
+    });
+
+    test("infers guestHomeDir from the defaulted user when user is omitted", () => {
+      expect(applyConfigDefaults(config()).guestHomeDir).toBe("/root");
+    });
+  });
+
   describe("network", () => {
     test("defaults omitted network to restricted with empty allowlists", () => {
       const result = applyConfigDefaults(config());

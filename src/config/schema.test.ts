@@ -53,10 +53,12 @@ describe("parseConfig", () => {
     });
   });
 
-  test("fills in defaults for minimal config", () => {
+  test("leaves optional fields unset for minimal config", () => {
+    // user/workdir carry no schema default (they're defaulted post-merge in
+    // applyConfigDefaults), so parseConfig leaves them undefined here.
     const config = parseConfig({});
-    expect(config.user).toBe("root");
-    expect(config.workdir).toBe("/");
+    expect(config.user).toBeUndefined();
+    expect(config.workdir).toBeUndefined();
     expect(config.network).toBeUndefined();
     expect(config.mounts).toBeUndefined();
     expect(config.nix).toBeUndefined();
