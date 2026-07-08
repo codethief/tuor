@@ -51,8 +51,12 @@ const types = scope({
      * The user to open the shell under and to make mounted directories
      * available for. Must currently be root due to Gondolin-related
      * constraints.
+     *
+     * Optional (no schema default): the "root" default is applied post-merge in
+     * applyConfigDefaults, so an inherited value isn't clobbered by a child
+     * layer that merely omitted the field.
      */
-    user: "string > 0 = 'root'",
+    "user?": "string > 0",
 
     /**
      * Volumes are host-backed, initially empty directories that the VM guest
@@ -61,9 +65,13 @@ const types = scope({
     "volumes?": "VolumeConfig[]",
 
     /**
-     * Configure the default working directory for the VM guest
+     * Configure the default working directory for the VM guest.
+     *
+     * Optional (no schema default): the "/" default is applied post-merge in
+     * applyConfigDefaults, so an inherited value isn't clobbered by a child
+     * layer that merely omitted the field.
      */
-    workdir: "WorkdirConfig = '/'",
+    "workdir?": "WorkdirConfig",
   },
 
   // --------------------------------------------------------------------------

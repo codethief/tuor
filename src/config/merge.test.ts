@@ -2,9 +2,13 @@ import { describe, expect, test } from "vitest";
 import { type ConfigLayer, findAllConfigDirs, mergeConfigs } from "./merge.ts";
 import type { MountConfig, TuorConfig } from "./schema.ts";
 
-/** Minimal valid config (matching what parseConfig returns with defaults filled). */
+/**
+ * Minimal valid config, matching what parseConfig returns: user/workdir carry
+ * no schema default, so an unset layer genuinely omits them (they're defaulted
+ * post-merge in applyConfigDefaults).
+ */
 function config(overrides: Partial<TuorConfig> = {}): TuorConfig {
-  return { user: "root", workdir: "/", ...overrides };
+  return { ...overrides };
 }
 
 function layer(
@@ -102,6 +106,27 @@ describe("mergeConfigs", () => {
         layer("/b", { workdir: "/child-dir" }),
       ]);
       expect(result.workdir).toBe("/child-dir");
+    });
+
+    // Regression: a child layer that omits user/workdir must inherit the
+    // parent's value rather than clobbering it. Previously these fields carried
+    // a schema default ("root"/"/"), so a child that never set them still
+    // overrode the parent — e.g. a project .tuor/config.json silently reset a
+    // workdir configured in ~/.config/tuor/config.json.
+    test("user: parent used when child omits", () => {
+      const result = mergeConfigs([
+        layer("/a", { user: "parent" }),
+        layer("/b"),
+      ]);
+      expect(result.user).toBe("parent");
+    });
+
+    test("workdir: parent used when child omits", () => {
+      const result = mergeConfigs([
+        layer("/a", { workdir: "/parent-dir" }),
+        layer("/b"),
+      ]);
+      expect(result.workdir).toBe("/parent-dir");
     });
 
     test("rootfsSize: child overrides parent", () => {
@@ -409,8 +434,9 @@ describe("mergeConfigs", () => {
         }),
       ]);
 
-      // Scalars: most specific child wins (child has default "root" from helper)
-      expect(result.user).toBe("root");
+      // Scalars: most specific layer that *sets* the field wins. The closest
+      // layer omits user, so it falls through to the middle layer.
+      expect(result.user).toBe("project-user");
 
       // Env: shallow merge
       expect(result.env).toEqual({
