@@ -1,5 +1,11 @@
 # Unreleased
 
+## Features
+- Config: Add `bootCommands`, a list of shell commands run once (as root, in the
+  configured `workdir`) right after the VM boots and before the interactive
+  shell / user command. Commands run in order and boot aborts on the first
+  non-zero exit. Across config layers the lists are concatenated (parent first).
+
 
 # 0.3.1 (2026-07-08)
 

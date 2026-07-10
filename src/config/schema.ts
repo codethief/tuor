@@ -10,6 +10,18 @@ const types = scope({
   TuorConfig: {
     "+": "reject",
 
+    /**
+     * Shell commands run once, as root, right after the VM boots and before the
+     * interactive shell / user command starts. Each entry is a command line
+     * executed via `sh -c` in the configured `workdir`. Useful for provisioning
+     * the guest (installing packages, seeding directories, …).
+     *
+     * Commands run in order; if any exits non-zero, boot is aborted and the VM
+     * is shut down (fail fast) so the workload never runs in a half-provisioned
+     * guest. Across config layers the lists are concatenated (parent first).
+     */
+    "bootCommands?": "(string > 0)[]",
+
     /** Environment variables to set in the guest. */
     "env?": { "[string]": "EnvValue" },
 

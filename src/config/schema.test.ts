@@ -132,6 +132,16 @@ describe("parseConfig", () => {
     expect(config.mounts![0]).not.toHaveProperty("ignoreFileRefs");
   });
 
+  test("accepts bootCommands as a list of shell strings", () => {
+    const config = parseConfig({ bootCommands: ["npm ci", "mkdir -p /cache"] });
+    expect(config.bootCommands).toEqual(["npm ci", "mkdir -p /cache"]);
+  });
+
+  test("omits bootCommands when not specified", () => {
+    const config = parseConfig({});
+    expect(config.bootCommands).toBeUndefined();
+  });
+
   test("accepts env with string values", () => {
     const config = parseConfig({ env: { MY_VAR: "hello" } });
     expect(config.env).toEqual({ MY_VAR: "hello" });
@@ -347,6 +357,8 @@ describe("parseConfig", () => {
       "volume with unknown field",
       { volumes: [{ guestPath: "/x", hostPath: "/y" }] },
     ],
+    ["bootCommands with empty-string entry", { bootCommands: [""] }],
+    ["bootCommands as a bare string", { bootCommands: "npm ci" }],
     ["non-object input", "not an object"],
     ["empty ignore array", { mounts: [{ hostPath: "/x", ignore: [] }] }],
     ["env with non-string value", { env: { X: { value: 123 } } }],

@@ -103,6 +103,7 @@ function mergeTwoConfigs(parent: TuorConfig, child: TuorConfig): TuorConfig {
     // Arrays: concatenate
     ...mergeArrayField(parent.mounts, child.mounts, "mounts"),
     ...mergeArrayField(parent.volumes, child.volumes, "volumes"),
+    ...mergeArrayField(parent.bootCommands, child.bootCommands, "bootCommands"),
 
     // Objects: shallow merge
     ...mergeEnv(parent.env, child.env),

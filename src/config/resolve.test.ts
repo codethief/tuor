@@ -636,6 +636,16 @@ describe("createSessionSpecFromConfig env integration", () => {
     const spec = resolve({ env: { MY_VAR: "hello" } }, "/cfg");
     expect(spec.secrets).toBeUndefined();
   });
+
+  test("passes bootCommands through to the session spec", () => {
+    const spec = resolve({ bootCommands: ["npm ci", "echo ready"] });
+    expect(spec.bootCommands).toEqual(["npm ci", "echo ready"]);
+  });
+
+  test("omits bootCommands when none configured", () => {
+    const spec = resolve({});
+    expect(spec.bootCommands).toBeUndefined();
+  });
 });
 
 describe("_getOverlayStateDir", () => {
