@@ -189,6 +189,14 @@ describe("mergeConfigs", () => {
       expect(result.volumes).toHaveLength(2);
     });
 
+    test("bootCommands are concatenated parent-first", () => {
+      const result = mergeConfigs([
+        layer("/a", { bootCommands: ["echo parent"] }),
+        layer("/b", { bootCommands: ["echo child"] }),
+      ]);
+      expect(result.bootCommands).toEqual(["echo parent", "echo child"]);
+    });
+
     test("parent-only mounts preserved when child has none", () => {
       const result = mergeConfigs([
         layer("/a", { mounts: [mount({ hostPath: "/data" })] }),

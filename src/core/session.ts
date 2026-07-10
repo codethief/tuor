@@ -43,6 +43,11 @@ export type SessionSpec = {
   env?: Record<string, string>;
   secrets?: Record<string, SecretSpec>;
   qemu?: QemuSpec;
+  /**
+   * Shell command lines run once, as root, after boot and before the shell.
+   * See TuorConfig.bootCommands.
+   */
+  bootCommands?: string[];
 };
 
 // --- Public API ---
@@ -78,6 +83,10 @@ export async function runSession(
     sandbox: spec.qemu,
   });
 
+  if (spec.bootCommands && spec.bootCommands.length > 0) {
+    await runBootCommands(vm, spec.bootCommands, spec.workdir);
+  }
+
   if (command) {
     console.log("Executing user command…");
   } else {
@@ -98,6 +107,63 @@ export async function runSession(
 }
 
 // --- Internals ---
+
+/**
+ * Run each configured boot command in order, as root (the VM's default exec
+ * user). Each command's output is captured (buffered) and echoed under an
+ * explicit header so it's clearly attributable to the command that produced it.
+ * Fails fast: the first non-zero exit aborts by throwing, so the caller shuts
+ * the VM down before the workload runs in a half-provisioned guest.
+ */
+async function runBootCommands(
+  vm: VM,
+  bootCommands: string[],
+  cwd: string,
+): Promise<void> {
+  for (const bootCommand of bootCommands) {
+    console.log(`Running boot command: ${bootCommand}`);
+    const result = await vm.exec(["/bin/sh", "-c", bootCommand], {
+      cwd,
+      stdout: "buffer",
+      stderr: "buffer",
+    });
+    // Echo stdout & stderr unconditionally for now. In the future we might add
+    // verbosity levels (-v/-vv) and gate output behind them.
+    const output = _formatCommandOutput(result.stdout, result.stderr);
+    if (output) {
+      console.log(output);
+    }
+    if (result.exitCode !== 0) {
+      await vm.close();
+      throw new Error(
+        `Boot command failed (exit ${result.exitCode}): ${bootCommand}`,
+      );
+    }
+  }
+}
+
+/**
+ * Merge a boot command's captured stdout and stderr into a single block for
+ * logging, prefixing each line with a gutter so command output is visually
+ * distinct from Tuor's own log lines. Returns "" when there is nothing to show.
+ *
+ * stdout and stderr are concatenated (stdout first). Buffer mode keeps them in
+ * separate buffers, so their original interleaving is not preserved — for now
+ * we accept this trade-off.
+ */
+export function _formatCommandOutput(stdout: string, stderr: string): string {
+  const combined = [stdout, stderr]
+    .map((stream) => stream.trimEnd())
+    .filter((stream) => stream.length > 0)
+    .join("\n");
+  if (combined.length === 0) {
+    return "";
+  }
+  return combined
+    .split("\n")
+    .map((line) => `  │ ${line}`)
+    .join("\n");
+}
 
 function buildNetworkOptions(
   network: NetworkSpec,

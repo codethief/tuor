@@ -114,6 +114,9 @@ export function createSessionSpecFromConfig(
     ...(hasEnv ? { env: mergedEnv } : {}),
     ...(hasSecrets ? { secrets } : {}),
     ...(qemu ? { qemu } : {}),
+    ...(config.bootCommands && config.bootCommands.length > 0
+      ? { bootCommands: config.bootCommands }
+      : {}),
   };
 }
 

@@ -10,6 +10,7 @@ on), which in turn inherit from the global `~/.config/tuor/config.json`. In
 general, child settings override parent settings, except in the following cases:
 
 - Env vars, mounts, volumes get merged (shallow merge).
+- Boot commands are concatenated (parent commands run first).
 - Network: Child network mode overrides parent mode; allowed hosts are merged.
 
 
@@ -70,6 +71,13 @@ that is not set on the host is an error.
       "injectForHosts": ["*.github.com"]
     }
   },
+  // Shell commands run once, as root, right after boot and before the shell /
+  // user command, in the configured workdir. Run in order; a non-zero exit
+  // aborts boot (fail fast). Handy for provisioning the guest.
+  "bootCommands": [
+    "apk add --no-cache ripgrep",
+    "mkdir -p /workspace/.cache"
+  ],
   "mounts": [
     {
       // Absolute or relative to config.json
