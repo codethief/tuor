@@ -12,10 +12,9 @@
 ## Bug fixes
 - Config: a child config layer (e.g. a project `.tuor/config.json`) that didn't
   set `workdir` or `user` silently reset the value inherited from an upper layer
-  layer (e.g. `~/.config/tuor/config.json`) to the built-in default values
-  (workdir: `/`, user: `root`). These fields now fall through to the parent
-  layer when omitted; their defaults are applied only after all layers are
-  merged.
+  (e.g. `~/.config/tuor/config.json`) to the built-in default values (workdir:
+  `/`, user: `root`). These fields now fall through to the parent layer when
+  omitted; their defaults are applied only after all layers are merged.
 
 
 # 0.3.0 (2026-07-08)
