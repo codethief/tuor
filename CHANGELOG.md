@@ -1,5 +1,8 @@
 # Unreleased
 
+
+# 0.4.0 (2026-07-19)
+
 ## Breaking changes
 - Config: `rootfsSize` moved from the config top level into the new `resources`
   block (i.e. `{ "resources": { "rootfsSize": "2G" } }`). Update configs that
