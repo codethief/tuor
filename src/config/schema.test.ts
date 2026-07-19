@@ -335,10 +335,38 @@ describe("parseConfig", () => {
     });
   });
 
+  describe("resources config", () => {
+    test("accepts memory and cpus", () => {
+      const config = parseConfig({ resources: { memory: "2G", cpus: 4 } });
+      expect(config.resources).toEqual({ memory: "2G", cpus: 4 });
+    });
+
+    test("accepts a partial config", () => {
+      const config = parseConfig({ resources: { cpus: 8 } });
+      expect(config.resources).toEqual({ cpus: 8 });
+    });
+
+    test("accepts memory without a unit suffix", () => {
+      const config = parseConfig({ resources: { memory: "1024" } });
+      expect(config.resources).toEqual({ memory: "1024" });
+    });
+
+    test("omits resources when not specified", () => {
+      const config = parseConfig({});
+      expect(config.resources).toBeUndefined();
+    });
+  });
+
   test.each([
     ["qemu unknown field", { qemu: { foo: "bar" } }],
     ["qemu empty accel", { qemu: { accel: "" } }],
     ["qemu non-string cpu", { qemu: { cpu: 42 } }],
+    ["resources unknown field", { resources: { foo: "bar" } }],
+    ["resources malformed memory", { resources: { memory: "2GB" } }],
+    ["resources empty memory", { resources: { memory: "" } }],
+    ["resources non-integer cpus", { resources: { cpus: 1.5 } }],
+    ["resources zero cpus", { resources: { cpus: 0 } }],
+    ["resources non-number cpus", { resources: { cpus: "4" } }],
     [
       "relative guestPath",
       { mounts: [{ hostPath: "/foo", guestPath: "rel" }] },

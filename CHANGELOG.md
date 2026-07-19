@@ -1,6 +1,9 @@
 # Unreleased
 
 ## Features
+- Config: Add `resources`, a block to size the VM's RAM (`memory`, QEMU syntax
+  e.g. "2G") and vCPU count (`cpus`). Unset fields fall back to Gondolin's
+  defaults (currently 1G memory, 2 cpus).
 - Config: Add `bootCommands`, a list of shell commands run once (as root, in the
   configured `workdir`) right after the VM boots and before the interactive
   shell / user command. Commands run in order and boot aborts on the first

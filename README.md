@@ -87,6 +87,7 @@ guarantees:
 - [Alibaba OpenSandbox](https://github.com/alibaba/OpenSandbox/)
 - [Docker Sandbox](https://docs.docker.com/ai/sandboxes/)
 - [Matchlock](https://github.com/jingkaihe/matchlock)
+- [SlicerVM](https://slicervm.com)
 
 
 ## Acknowledgements

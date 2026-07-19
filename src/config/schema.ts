@@ -53,6 +53,12 @@ const types = scope({
     "qemu?": "QemuConfig",
 
     /**
+     * VM resource sizing (RAM, vCPU count). Any field left unset falls back to
+     * Gondolin's own defaults (1G memory, 2 cpus) — see ResourcesConfig.
+     */
+    "resources?": "ResourcesConfig",
+
+    /**
      * Minimum virtual disk size for the rootfs (e.g. "2G", "512M").
      * The COW overlay will be grown to at least this size before boot.
      * Actual host disk usage remains sparse (only written pages cost space).
@@ -264,12 +270,36 @@ const types = scope({
     /** QEMU `-machine` type, e.g. "q35", "microvm", "virt". */
     "machineType?": "string > 0",
   },
+
+  // --------------------------------------------------------------------------
+  // VM resources
+  // --------------------------------------------------------------------------
+
+  /**
+   * VM resource sizing, forwarded verbatim to Gondolin.
+   */
+  ResourcesConfig: {
+    "+": "reject",
+    /**
+     * VM RAM in QEMU syntax: a positive integer with an optional K/M/G/T
+     * suffix, e.g. "512M", "2G". Maps to Gondolin's `memory` top-level option.
+     * Gondolin default: "1G".
+     */
+    "memory?": type("string > 0").matching(/^\d+[KMGT]?$/i),
+    /** 
+     * VM vCPU count (positive integer). Maps to Gondolin's `cpus` top-level
+     * option. Gondolin default: 2. Note that this config option is distinct
+     * from `QemuConfig.cpu` (the emulated CPU *model*)!
+     */
+    "cpus?": "number.integer >= 1",
+  },
 }).export();
 
 export type VolumeConfig = typeof types.VolumeConfig.infer;
 export type MountConfig = typeof types.MountConfig.infer;
 export type NixConfig = typeof types.NixConfig.infer;
 export type QemuConfig = typeof types.QemuConfig.infer;
+export type ResourcesConfig = typeof types.ResourcesConfig.infer;
 export type NetworkConfig = typeof types.NetworkConfig.infer;
 export type EnvFromHost = typeof types.EnvFromHost.infer;
 export type EnvSecret = typeof types.EnvSecret.infer;

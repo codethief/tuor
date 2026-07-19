@@ -5,6 +5,7 @@ import type {
   MountConfig,
   NetworkConfig,
   QemuConfig,
+  ResourcesConfig,
   TuorConfig,
 } from "./schema.ts";
 
@@ -100,6 +101,9 @@ function mergeTwoConfigs(parent: TuorConfig, child: TuorConfig): TuorConfig {
     // Qemu: deep-merge each variant, child field wins
     ...mergeQemu(parent.qemu, child.qemu),
 
+    // Resources: deep-merge each field, child field wins
+    ...mergeResources(parent.resources, child.resources),
+
     // Arrays: concatenate
     ...mergeArrayField(parent.mounts, child.mounts, "mounts"),
     ...mergeArrayField(parent.volumes, child.volumes, "volumes"),
@@ -179,6 +183,15 @@ function mergeQemu(
   if (!parentQemu && !childQemu) return {} as Record<string, never>;
   // Shallow merge: each field (accel/cpu/machineType) is a scalar, child wins.
   return { qemu: { ...parentQemu, ...childQemu } };
+}
+
+function mergeResources(
+  parentResources: ResourcesConfig | undefined,
+  childResources: ResourcesConfig | undefined,
+): { resources: ResourcesConfig } | Record<string, never> {
+  if (!parentResources && !childResources) return {} as Record<string, never>;
+  // Shallow merge: each field (memory/cpus) is a scalar, child wins.
+  return { resources: { ...parentResources, ...childResources } };
 }
 
 function mergeStringArrayField<K extends string>(

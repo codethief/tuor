@@ -94,6 +94,13 @@ that is not set on the host is an error.
       "ignoreFileRefs": ["host:./tuorignore", "mount:.tuorignore"]
     }
   ],
+  // VM resource sizing. Any field left unset falls back to Gondolin's default
+  // (1G memory, 2 cpus). Note that `cpus` (the vCPU count) is distinct from
+  // `qemu.cpu` (the emulated CPU model).
+  "resources": {
+    "cpus": 4,       // vCPU count (positive integer)
+    "memory": "2G"  // RAM, QEMU syntax (e.g. "512M", "2G")
+  },
   // Minimum virtual disk size (COW overlay, so actual host usage stays
   // sparse). Note that the virtual disk will be discarded on VM shutdown,
   // so it is not meant for persisting data across VM boots. (Use mounts &
