@@ -336,9 +336,15 @@ describe("parseConfig", () => {
   });
 
   describe("resources config", () => {
-    test("accepts memory and cpus", () => {
-      const config = parseConfig({ resources: { memory: "2G", cpus: 4 } });
-      expect(config.resources).toEqual({ memory: "2G", cpus: 4 });
+    test("accepts memory, cpus and rootfsSize", () => {
+      const config = parseConfig({
+        resources: { memory: "2G", cpus: 4, rootfsSize: "8G" },
+      });
+      expect(config.resources).toEqual({
+        memory: "2G",
+        cpus: 4,
+        rootfsSize: "8G",
+      });
     });
 
     test("accepts a partial config", () => {

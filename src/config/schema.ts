@@ -53,17 +53,9 @@ const types = scope({
     "qemu?": "QemuConfig",
 
     /**
-     * VM resource sizing (RAM, vCPU count). Any field left unset falls back to
-     * Gondolin's own defaults (1G memory, 2 cpus) — see ResourcesConfig.
+     * VM resource sizing (RAM, vCPU count, rootfs disk size).
      */
     "resources?": "ResourcesConfig",
-
-    /**
-     * Minimum virtual disk size for the rootfs (e.g. "2G", "512M").
-     * The COW overlay will be grown to at least this size before boot.
-     * Actual host disk usage remains sparse (only written pages cost space).
-     */
-    "rootfsSize?": "string > 0",
 
     /**
      * The user to open the shell under and to make mounted directories
@@ -286,12 +278,20 @@ const types = scope({
      * Gondolin default: "1G".
      */
     "memory?": type("string > 0").matching(/^\d+[KMGT]?$/i),
-    /** 
+    /**
      * VM vCPU count (positive integer). Maps to Gondolin's `cpus` top-level
      * option. Gondolin default: 2. Note that this config option is distinct
      * from `QemuConfig.cpu` (the emulated CPU *model*)!
      */
     "cpus?": "number.integer >= 1",
+    /**
+     * Minimum virtual disk size for the rootfs (e.g. "2G", "512M"). The COW
+     * overlay will be grown to at least this size before boot. Actual host disk
+     * usage remains sparse (only written pages cost space). The config option
+     * maps to Gondolin's `rootfs.size` and defaults to the size of the base
+     * image used by Gondolin (no minimum growth).
+     */
+    "rootfsSize?": "string > 0",
   },
 }).export();
 

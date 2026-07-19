@@ -116,7 +116,6 @@ export function createSessionSpecFromConfig(
     network: config.network,
     mounts: allMounts,
     ...(volumes.length > 0 ? { volumes } : {}),
-    ...(config.rootfsSize ? { rootfsSize: config.rootfsSize } : {}),
     ...(resources ? { resources } : {}),
     ...(hasEnv ? { env: mergedEnv } : {}),
     ...(hasSecrets ? { secrets } : {}),
