@@ -447,6 +447,28 @@ describe("createSessionSpecFromConfig", () => {
       expect(spec.qemu).toBeUndefined();
     });
   });
+
+  describe("resources resolution", () => {
+    test("omits resources when nothing is configured", () => {
+      const spec = resolve({});
+      expect(spec.resources).toBeUndefined();
+    });
+
+    test("passes the resources config through verbatim", () => {
+      const spec = resolve({ resources: { memory: "2G", cpus: 4 } });
+      expect(spec.resources).toEqual({ memory: "2G", cpus: 4 });
+    });
+
+    test("passes a partial resources config through", () => {
+      const spec = resolve({ resources: { cpus: 8 } });
+      expect(spec.resources).toEqual({ cpus: 8 });
+    });
+
+    test("treats an empty resources config as unset", () => {
+      const spec = resolve({ resources: {} });
+      expect(spec.resources).toBeUndefined();
+    });
+  });
 });
 
 describe("_resolveEnv", () => {

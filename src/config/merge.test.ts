@@ -423,6 +423,29 @@ describe("mergeConfigs", () => {
     });
   });
 
+  describe("resources: shallow field merge", () => {
+    test("child field overrides parent, others preserved", () => {
+      const result = mergeConfigs([
+        layer("/a", { resources: { memory: "1G", cpus: 2 } }),
+        layer("/b", { resources: { cpus: 8 } }),
+      ]);
+      expect(result.resources).toEqual({ memory: "1G", cpus: 8 });
+    });
+
+    test("parent resources used when child has none", () => {
+      const result = mergeConfigs([
+        layer("/a", { resources: { memory: "4G" } }),
+        layer("/b"),
+      ]);
+      expect(result.resources).toEqual({ memory: "4G" });
+    });
+
+    test("no resources when neither layer has it", () => {
+      const result = mergeConfigs([layer("/a"), layer("/b")]);
+      expect(result.resources).toBeUndefined();
+    });
+  });
+
   describe("three-level merge", () => {
     test("most specific wins for scalars, arrays concatenate across all layers", () => {
       const result = mergeConfigs([

@@ -6,7 +6,12 @@ import type {
   VolumeSpec,
 } from "../core/mounts.ts";
 import { validateMounts } from "../core/mounts.ts";
-import type { QemuSpec, SecretSpec, SessionSpec } from "../core/session.ts";
+import type {
+  QemuSpec,
+  ResourcesSpec,
+  SecretSpec,
+  SessionSpec,
+} from "../core/session.ts";
 import type { ScopedPattern } from "../core/shadow.ts";
 import type { DefaultedConfig } from "./defaults.ts";
 import { expandTilde } from "./homedir.ts";
@@ -103,6 +108,7 @@ export function createSessionSpecFromConfig(
   const hasSecrets = Object.keys(secrets).length > 0;
 
   const qemu = resolveQemu(config.qemu);
+  const resources = resolveResources(config.resources);
 
   return {
     user: config.user,
@@ -111,6 +117,7 @@ export function createSessionSpecFromConfig(
     mounts: allMounts,
     ...(volumes.length > 0 ? { volumes } : {}),
     ...(config.rootfsSize ? { rootfsSize: config.rootfsSize } : {}),
+    ...(resources ? { resources } : {}),
     ...(hasEnv ? { env: mergedEnv } : {}),
     ...(hasSecrets ? { secrets } : {}),
     ...(qemu ? { qemu } : {}),
@@ -243,6 +250,18 @@ function resolveWorkdir(
 function resolveQemu(qemu: TuorConfig["qemu"]): QemuSpec | undefined {
   if (!qemu || Object.keys(qemu).length === 0) return undefined;
   return { ...qemu };
+}
+
+/**
+ * Pass the configured VM resource knobs through verbatim. We ship no defaults:
+ * any field left unset falls back to Gondolin's own default (currently 1G
+ * memory, 2 cpus). Returns undefined when nothing is configured.
+ */
+function resolveResources(
+  resources: TuorConfig["resources"],
+): ResourcesSpec | undefined {
+  if (!resources || Object.keys(resources).length === 0) return undefined;
+  return { ...resources };
 }
 
 function resolveVolumeConfig(
