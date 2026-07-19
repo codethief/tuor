@@ -1,9 +1,14 @@
 # Unreleased
 
+## Breaking changes
+- Config: `rootfsSize` moved from the config top level into the new `resources`
+  block (i.e. `{ "resources": { "rootfsSize": "2G" } }`). Update configs that
+  set it at the top level.
+
 ## Features
 - Config: Add `resources`, a block to size the VM's RAM (`memory`, QEMU syntax
-  e.g. "2G") and vCPU count (`cpus`). Unset fields fall back to Gondolin's
-  defaults (currently 1G memory, 2 cpus).
+  e.g. "2G"), vCPU count (`cpus`), and rootfs disk size (`rootfsSize`, moved
+  here from the top level).
 - Config: Add `bootCommands`, a list of shell commands run once (as root, in the
   configured `workdir`) right after the VM boots and before the interactive
   shell / user command. Commands run in order and boot aborts on the first

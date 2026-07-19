@@ -80,11 +80,15 @@ describe("applyConfigDefaults", () => {
   });
 
   test("leaves other fields untouched", () => {
-    const input = config({ user: "dev", workdir: "/work", rootfsSize: "2G" });
+    const input = config({
+      user: "dev",
+      workdir: "/work",
+      resources: { rootfsSize: "2G" },
+    });
     const result = applyConfigDefaults(input);
     expect(result.user).toBe("dev");
     expect(result.workdir).toBe("/work");
-    expect(result.rootfsSize).toBe("2G");
+    expect(result.resources).toEqual({ rootfsSize: "2G" });
   });
 
   test("does not mutate the input config", () => {

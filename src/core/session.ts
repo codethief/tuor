@@ -33,12 +33,14 @@ export type QemuSpec = {
 };
 
 /**
- * Resolved VM resource sizing. Fields map verbatim to Gondolin's top-level
- * `memory`/`cpus` options; an unset field falls back to Gondolin's default.
+ * Resolved VM resource sizing. `memory`/`cpus` map verbatim to Gondolin's
+ * top-level options; `rootfsSize` maps to `rootfs.size`. An unset field falls
+ * back to Gondolin's default.
  */
 export type ResourcesSpec = {
   memory?: string;
   cpus?: number;
+  rootfsSize?: string;
 };
 
 /** Core's top-level input contract — everything the session needs to run. */
@@ -48,7 +50,6 @@ export type SessionSpec = {
   network: NetworkSpec;
   mounts: MountSpec[];
   volumes?: VolumeSpec[];
-  rootfsSize?: string;
   resources?: ResourcesSpec;
   env?: Record<string, string>;
   secrets?: Record<string, SecretSpec>;
@@ -87,7 +88,9 @@ export async function runSession(
   console.log("Starting VM…");
   const vm = await VM.create({
     ...networkOptions,
-    ...(spec.rootfsSize ? { rootfs: { size: spec.rootfsSize } } : {}),
+    ...(spec.resources?.rootfsSize
+      ? { rootfs: { size: spec.resources.rootfsSize } }
+      : {}),
     ...(spec.resources?.memory ? { memory: spec.resources.memory } : {}),
     ...(spec.resources?.cpus ? { cpus: spec.resources.cpus } : {}),
     ...(hasEnv ? { env: mergedEnv } : {}),

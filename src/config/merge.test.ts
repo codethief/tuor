@@ -129,22 +129,6 @@ describe("mergeConfigs", () => {
       expect(result.workdir).toBe("/parent-dir");
     });
 
-    test("rootfsSize: child overrides parent", () => {
-      const result = mergeConfigs([
-        layer("/a", { rootfsSize: "1G" }),
-        layer("/b", { rootfsSize: "4G" }),
-      ]);
-      expect(result.rootfsSize).toBe("4G");
-    });
-
-    test("rootfsSize: parent used when child omits", () => {
-      const result = mergeConfigs([
-        layer("/a", { rootfsSize: "1G" }),
-        layer("/b"),
-      ]);
-      expect(result.rootfsSize).toBe("1G");
-    });
-
     test("guestHomeDir: child overrides parent", () => {
       const result = mergeConfigs([
         layer("/a", { guestHomeDir: "/old" }),
@@ -430,6 +414,22 @@ describe("mergeConfigs", () => {
         layer("/b", { resources: { cpus: 8 } }),
       ]);
       expect(result.resources).toEqual({ memory: "1G", cpus: 8 });
+    });
+
+    test("distinct fields across layers are combined", () => {
+      const result = mergeConfigs([
+        layer("/a", { resources: { memory: "1G" } }),
+        layer("/b", { resources: { rootfsSize: "4G" } }),
+      ]);
+      expect(result.resources).toEqual({ memory: "1G", rootfsSize: "4G" });
+    });
+
+    test("child rootfsSize overrides parent", () => {
+      const result = mergeConfigs([
+        layer("/a", { resources: { rootfsSize: "1G" } }),
+        layer("/b", { resources: { rootfsSize: "4G" } }),
+      ]);
+      expect(result.resources).toEqual({ rootfsSize: "4G" });
     });
 
     test("parent resources used when child has none", () => {

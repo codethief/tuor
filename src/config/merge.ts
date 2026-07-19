@@ -95,7 +95,6 @@ function mergeTwoConfigs(parent: TuorConfig, child: TuorConfig): TuorConfig {
     ...lastDefined(child.user, parent.user, "user"),
     ...lastDefined(child.workdir, parent.workdir, "workdir"),
     ...lastDefined(child.guestHomeDir, parent.guestHomeDir, "guestHomeDir"),
-    ...lastDefined(child.rootfsSize, parent.rootfsSize, "rootfsSize"),
     ...lastDefined(child.nix, parent.nix, "nix"),
 
     // Qemu: deep-merge each variant, child field wins

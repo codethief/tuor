@@ -392,16 +392,6 @@ describe("createSessionSpecFromConfig", () => {
       expect(spec.user).toBe("dev");
     });
 
-    test("passes through rootfsSize", () => {
-      const spec = resolve({ rootfsSize: "2G" });
-      expect(spec.rootfsSize).toBe("2G");
-    });
-
-    test("omits rootfsSize when not set", () => {
-      const spec = resolve({});
-      expect(spec.rootfsSize).toBeUndefined();
-    });
-
     test("infers guestHomeDir from user for tilde expansion", () => {
       const spec = resolve({
         user: "alice",
@@ -455,8 +445,14 @@ describe("createSessionSpecFromConfig", () => {
     });
 
     test("passes the resources config through verbatim", () => {
-      const spec = resolve({ resources: { memory: "2G", cpus: 4 } });
-      expect(spec.resources).toEqual({ memory: "2G", cpus: 4 });
+      const spec = resolve({
+        resources: { memory: "2G", cpus: 4, rootfsSize: "8G" },
+      });
+      expect(spec.resources).toEqual({
+        memory: "2G",
+        cpus: 4,
+        rootfsSize: "8G",
+      });
     });
 
     test("passes a partial resources config through", () => {
