@@ -83,8 +83,10 @@ describe("findAllConfigDirs", () => {
 
 describe("mergeConfigs", () => {
   test("single layer returns config unchanged (except path pre-resolution)", () => {
-    const result = mergeConfigs([layer("/project/.tuor", { user: "dev" })]);
-    expect(result.user).toBe("dev");
+    const result = mergeConfigs([
+      layer("/project/.tuor", { guestUser: { uid: 0, gid: 0 } }),
+    ]);
+    expect(result.guestUser).toEqual({ uid: 0, gid: 0 });
   });
 
   test("throws on empty layers", () => {
@@ -92,12 +94,12 @@ describe("mergeConfigs", () => {
   });
 
   describe("scalar fields: child wins", () => {
-    test("user", () => {
+    test("guestUser: carried through when set (only root is valid)", () => {
       const result = mergeConfigs([
-        layer("/a", { user: "parent" }),
-        layer("/b", { user: "child" }),
+        layer("/a", { guestUser: { uid: 0, gid: 0 } }),
+        layer("/b", { guestUser: { uid: 0, gid: 0 } }),
       ]);
-      expect(result.user).toBe("child");
+      expect(result.guestUser).toEqual({ uid: 0, gid: 0 });
     });
 
     test("workdir string", () => {
@@ -108,17 +110,17 @@ describe("mergeConfigs", () => {
       expect(result.workdir).toBe("/child-dir");
     });
 
-    // Regression: a child layer that omits user/workdir must inherit the
+    // Regression: a child layer that omits guestUser/workdir must inherit the
     // parent's value rather than clobbering it. Previously these fields carried
     // a schema default ("root"/"/"), so a child that never set them still
     // overrode the parent — e.g. a project .tuor/config.json silently reset a
     // workdir configured in ~/.config/tuor/config.json.
-    test("user: parent used when child omits", () => {
+    test("guestUser: parent used when child omits", () => {
       const result = mergeConfigs([
-        layer("/a", { user: "parent" }),
+        layer("/a", { guestUser: { uid: 0, gid: 0 } }),
         layer("/b"),
       ]);
-      expect(result.user).toBe("parent");
+      expect(result.guestUser).toEqual({ uid: 0, gid: 0 });
     });
 
     test("workdir: parent used when child omits", () => {
@@ -450,12 +452,12 @@ describe("mergeConfigs", () => {
     test("most specific wins for scalars, arrays concatenate across all layers", () => {
       const result = mergeConfigs([
         layer("/home/.config/tuor", {
-          user: "home-user",
+          workdir: "/home-wd",
           env: { EDITOR: "vim" },
           mounts: [mount({ hostPath: "/global-tools" })],
         }),
         layer("/projects/.tuor", {
-          user: "project-user",
+          workdir: "/project-wd",
           env: { EDITOR: "nano", PROJECT: "myproj" },
           mounts: [mount({ hostPath: "/project-data" })],
         }),
@@ -466,8 +468,8 @@ describe("mergeConfigs", () => {
       ]);
 
       // Scalars: most specific layer that *sets* the field wins. The closest
-      // layer omits user, so it falls through to the middle layer.
-      expect(result.user).toBe("project-user");
+      // layer omits workdir, so it falls through to the middle layer.
+      expect(result.workdir).toBe("/project-wd");
 
       // Env: shallow merge
       expect(result.env).toEqual({

@@ -1,15 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { expandTilde, inferGuestHomeDir } from "./homedir.ts";
-
-describe("inferGuestHomeDir", () => {
-  test("returns /root for root user", () => {
-    expect(inferGuestHomeDir("root")).toBe("/root");
-  });
-
-  test("returns /home/$user for non-root user", () => {
-    expect(inferGuestHomeDir("dev")).toBe("/home/dev");
-  });
-});
+import { expandTilde } from "./homedir.ts";
 
 describe("expandTilde", () => {
   test("expands bare ~ to homeDir", () => {

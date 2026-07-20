@@ -33,7 +33,11 @@ function resolve(
   configDir = "/home/user/.tuor",
   deps = validDeps,
 ) {
-  const full: TuorConfig = { user: "root", workdir: "/", ...config };
+  const full: TuorConfig = {
+    guestUser: { uid: 0, gid: 0 },
+    workdir: "/",
+    ...config,
+  };
   return createSessionSpecFromConfig(
     applyConfigDefaults(full),
     configDir,
@@ -103,7 +107,7 @@ describe("createSessionSpecFromConfig", () => {
 
     test("expands ~ in guestPath using guest home dir", () => {
       const spec = resolve({
-        user: "bob",
+        guestHomeDir: "/home/bob",
         mounts: [
           { hostPath: "/opt/data", guestPath: "~/data", mode: "readonly" },
         ],
@@ -254,7 +258,7 @@ describe("createSessionSpecFromConfig", () => {
 
     test("expands ~ in MountConfig workdir guestPath using guest home dir", () => {
       const spec = resolve({
-        user: "bob",
+        guestHomeDir: "/home/bob",
         workdir: {
           hostPath: "/host/project",
           guestPath: "~/project",
@@ -278,7 +282,7 @@ describe("createSessionSpecFromConfig", () => {
 
     test("expands tilde in guestPath using guest home dir", () => {
       const spec = resolve({
-        user: "bob",
+        guestHomeDir: "/home/bob",
         volumes: [{ guestPath: "~/data" }],
       });
       expect(spec.volumes![0]).toMatchObject({
@@ -387,22 +391,15 @@ describe("createSessionSpecFromConfig", () => {
   });
 
   describe("other fields", () => {
-    test("passes through user", () => {
-      const spec = resolve({ user: "dev" });
-      expect(spec.user).toBe("dev");
-    });
-
-    test("infers guestHomeDir from user for tilde expansion", () => {
+    test("defaults guestHomeDir to /root for tilde expansion", () => {
       const spec = resolve({
-        user: "alice",
         mounts: [{ hostPath: "/data", guestPath: "~/data", mode: "readonly" }],
       });
-      expect(spec.mounts[0]!.guestPath).toBe("/home/alice/data");
+      expect(spec.mounts[0]!.guestPath).toBe("/root/data");
     });
 
     test("uses explicit guestHomeDir override for tilde expansion", () => {
       const spec = resolve({
-        user: "alice",
         guestHomeDir: "/custom/home",
         mounts: [{ hostPath: "/data", guestPath: "~/data", mode: "readonly" }],
       });

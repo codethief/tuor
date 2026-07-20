@@ -34,7 +34,7 @@ export const command = buildCommand({
             allowedHosts: [],
             allowedInternalHosts: [],
           },
-      user: "root",
+      guestUser: { uid: 0, gid: 0 },
       workdir: {
         hostPath: "..",
         mode: workspaceMode,

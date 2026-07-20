@@ -1,5 +1,10 @@
 # Unreleased
 
+## Breaking changes
+- Config: the guest user is now configured as `guestUser: { uid, gid }` (numeric)
+  instead of the `user: "<name>"` string. It must currently be
+  `{ uid: 0, gid: 0 }` (root). Update configs that set `user`.
+
 
 # 0.4.0 (2026-07-19)
 
