@@ -1,5 +1,5 @@
 import { existsSync, realpathSync } from "node:fs";
-import type { MountSpec } from "../core/mounts.ts";
+import type { MountSpec, Owner } from "../core/mounts.ts";
 import type { NixConfig } from "./schema.ts";
 
 // --- Types ---
@@ -23,6 +23,7 @@ export type NixDeps = {
 export function resolveNixSetup(
   config: NixConfig,
   deps: NixDeps = defaultNixDeps,
+  defaultOwner: Owner = { uid: 0, gid: 0 },
 ): NixSetup {
   if (!deps.nixExists()) {
     throw new Error("/nix does not exist on the host. Is Nix installed?");
@@ -38,7 +39,7 @@ export function resolveNixSetup(
   }
 
   return {
-    mounts: buildMounts(config, deps),
+    mounts: buildMounts(config, defaultOwner, deps),
     env: buildEnv(profiles, deps.hostEnv, deps.realpath, deps.warn),
   };
 }
@@ -80,13 +81,18 @@ function resolveExplicitProfiles(profiles: string[], deps: NixDeps): string[] {
   });
 }
 
-function buildMounts(config: NixConfig, deps: NixDeps): MountSpec[] {
+function buildMounts(
+  config: NixConfig,
+  defaultOwner: Owner,
+  deps: NixDeps,
+): MountSpec[] {
   const mounts: MountSpec[] = [
     {
       hostPath: "/nix",
       guestPath: "/nix",
       mode: "readonly",
       shadowPatterns: [],
+      owner: defaultOwner,
     },
   ];
 
@@ -102,6 +108,7 @@ function buildMounts(config: NixConfig, deps: NixDeps): MountSpec[] {
       guestPath: "/lib64",
       mode: "readonly",
       shadowPatterns: [],
+      owner: defaultOwner,
     });
   }
 

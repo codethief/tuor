@@ -7,7 +7,10 @@ import {
   type VirtualProvider,
 } from "@earendil-works/gondolin";
 import { OverlayProvider } from "./overlay-provider.ts";
+import { type Owner, OwnershipProvider } from "./ownership-provider.ts";
 import { buildShadowPredicate, type ScopedPattern } from "./shadow.ts";
+
+export type { Owner };
 
 // --- Types ---
 
@@ -24,6 +27,8 @@ export type VolumeSpec = {
   guestPath: string;
   /** On-host directory where the volume's data is stored. */
   stateDir: string;
+  /** Ownership (uid/gid) presented to the guest for this volume's entries. */
+  owner: Owner;
 };
 
 /** Core's input contract for a single mount — fully resolved, no optionals. */
@@ -32,6 +37,8 @@ export type MountSpec = {
   guestPath: string;
   mode: MountMode;
   shadowPatterns: ScopedPattern[];
+  /** Ownership (uid/gid) presented to the guest for this mount's entries. */
+  owner: Owner;
   /** Pre-computed path for persistent overlay state. Only for 'overlay' mode. */
   overlayStateDir?: string;
 };
@@ -80,7 +87,10 @@ export function buildVfsVolumes(
   const result: Record<string, VirtualProvider> = {};
   for (const vol of volumes) {
     mkdirSync(vol.stateDir, { recursive: true });
-    result[vol.guestPath] = new RealFSProvider(vol.stateDir);
+    result[vol.guestPath] = new OwnershipProvider(
+      new RealFSProvider(vol.stateDir),
+      vol.owner,
+    );
   }
   return result;
 }
@@ -100,18 +110,16 @@ export function buildVfsMounts(
       });
     }
 
+    let provider: VirtualProvider;
     switch (mount.mode) {
       case "readwrite":
-        result[mount.guestPath] = backend;
+        provider = backend;
         break;
       case "readonly":
-        result[mount.guestPath] = new ReadonlyProvider(backend);
+        provider = new ReadonlyProvider(backend);
         break;
       case "overlay-tmpfs":
-        result[mount.guestPath] = new OverlayProvider(
-          backend,
-          new MemoryProvider(),
-        );
+        provider = new OverlayProvider(backend, new MemoryProvider());
         break;
       case "overlay": {
         const stateDir = mount.overlayStateDir;
@@ -121,13 +129,14 @@ export function buildVfsMounts(
           );
         }
         mkdirSync(stateDir, { recursive: true });
-        result[mount.guestPath] = new OverlayProvider(
-          backend,
-          new RealFSProvider(stateDir),
-        );
+        provider = new OverlayProvider(backend, new RealFSProvider(stateDir));
         break;
       }
     }
+
+    // Rewrite ownership outermost, so it's consistent across all mount modes
+    // (incl. overlay upper-layer and guest-created files).
+    result[mount.guestPath] = new OwnershipProvider(provider, mount.owner);
   }
   return result;
 }

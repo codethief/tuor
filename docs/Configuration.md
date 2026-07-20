@@ -91,7 +91,11 @@ that is not set on the host is an error.
       "ignore": [".env", "secret.key", ".tuor"],
       // Files to read list of ignored files from (think .gitignore). Paths are
       // either host paths or mount-relative paths.
-      "ignoreFileRefs": ["host:./tuorignore", "mount:.tuorignore"]
+      "ignoreFileRefs": ["host:./tuorignore", "mount:.tuorignore"],
+      // Optional: uid/gid presented to the guest for this mount's entries
+      // (defaults to guestUser). Display-only: does not change host-side
+      // ownership. Either field may be omitted to inherit from guestUser.
+      "owner": { "uid": 0, "gid": 0 }
     }
   ],
   // VM resource sizing. Any field left unset falls back to Gondolin's default
@@ -112,7 +116,8 @@ that is not set on the host is an error.
   // Constraint: uid/gid must currently be root ({ uid: 0, gid: 0 }).
   "guestUser": { "uid": 0, "gid": 0, "homedir": "/root" },
   // Persistent guest directories without a host backing directory (
-  // similar to Docker volumes)
+  // similar to Docker volumes). Like mounts, they accept an optional `owner`, 
+  // defaults to guestUser).
   "volumes": [
     { "guestPath": "~/.claude" }  // Persist Claude Code state
   ],

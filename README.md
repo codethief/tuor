@@ -18,6 +18,9 @@ Tuor exposes a wide number of Gondolin's features:
   the guest (read-only or read/write).
 - **Hide host files**: Within a mounted directory, hide select files (e.g.
   `.envrc` files with credentials) from the VM guest.
+- **Custom file ownership**: Control the uid/gid a mount or volume is presented
+  as owned by in the guest (defaults to the guest user), independent of the
+  files' real on-host ownership.
 - **Network control**: Restrict network egress to HTTP and specific hosts. DNS
   is provided by the sandbox, so as to prevent data exfiltration through UDP 53.
 - **Secret injection**: Prevent the guest from seeing your auth tokens &
