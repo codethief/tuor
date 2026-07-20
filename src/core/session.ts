@@ -109,10 +109,11 @@ export async function runSession(
   // Run directly as root — Gondolin's default exec user — with the guest init
   // environment (HOME=/root, PATH, …). Only root is supported for now, so
   // there's no user to `su` into; $USER/$LOGNAME are left unset (`id`/`whoami`
-  // still report root). cwd is set explicitly below.
+  // still report root). cwd is set explicitly below. We use bash, matching
+  // Gondolin's own default command (["/bin/bash", "-i"]).
   const shellCommand = command
-    ? ["/bin/sh", "-c", command.join(" ")]
-    : ["/bin/sh", "-i"];
+    ? ["/bin/bash", "-c", command.join(" ")]
+    : ["/bin/bash", "-i"];
   await vm.shell({
     attach: true,
     command: shellCommand,
