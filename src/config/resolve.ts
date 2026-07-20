@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 import type {
   MountSpec,
   MountValidationDeps,
+  Owner,
   VolumeSpec,
 } from "../core/mounts.ts";
 import { validateMounts } from "../core/mounts.ts";
@@ -58,6 +59,12 @@ export function createSessionSpecFromConfig(
   deps: ResolveDeps = defaultResolveDeps,
 ): SessionSpec {
   const guestHomeDir = config.guestUser.homedir;
+  // Default owner for mounts/volumes: the guest user's uid/gid (per-mount and
+  // per-volume `owner` configs override individual fields).
+  const defaultOwner: Owner = {
+    uid: config.guestUser.uid,
+    gid: config.guestUser.gid,
+  };
 
   // Resolve workdir
   const { guestWorkdir, workdirMount } = resolveWorkdir(
@@ -80,20 +87,21 @@ export function createSessionSpecFromConfig(
       configDir,
       hostHomeDir,
       guestHomeDir,
+      defaultOwner,
       deps.ignoreFile,
     ),
   );
 
   // Resolve nix
   const nixSetup = config.nix
-    ? resolveNixSetup(config.nix, deps.nix)
+    ? resolveNixSetup(config.nix, deps.nix, defaultOwner)
     : undefined;
 
   const allMounts = [...(nixSetup?.mounts ?? []), ...userMounts];
 
   // Resolve volumes
   const volumes = (config.volumes ?? []).map((v) =>
-    resolveVolumeConfig(v, configDir, guestHomeDir),
+    resolveVolumeConfig(v, configDir, guestHomeDir, defaultOwner),
   );
 
   validateMounts(allMounts, volumes, deps.mountValidation);
@@ -132,6 +140,7 @@ function resolveMountConfig(
   configDir: string,
   hostHomeDir: string,
   guestHomeDir: string,
+  defaultOwner: Owner,
   ignoreFileDeps: IgnoreFileDeps,
 ): MountSpec {
   // When guestPath is omitted, we use the expanded *host* path — even if
@@ -164,6 +173,7 @@ function resolveMountConfig(
     guestPath,
     mode: m.mode,
     shadowPatterns,
+    owner: { ...defaultOwner, ...m.owner },
     ...(m.mode === "overlay"
       ? { overlayStateDir: _getOverlayStateDir(configDir, guestPath) }
       : {}),
@@ -266,11 +276,13 @@ function resolveVolumeConfig(
   v: VolumeConfig,
   configDir: string,
   guestHomeDir: string,
+  defaultOwner: Owner,
 ): VolumeSpec {
   const guestPath = expandTilde(v.guestPath, guestHomeDir);
   return {
     guestPath,
     stateDir: _getOverlayStateDir(configDir, guestPath),
+    owner: { ...defaultOwner, ...v.owner },
   };
 }
 

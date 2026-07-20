@@ -9,6 +9,19 @@
   in Gondolin's `VM.shell()`.
 - Config: the top-level `guestHomeDir` moved into `guestUser` as
   `guestUser.homedir`. Update configs that set `guestHomeDir`.
+- Mounts and volumes are now presented to the guest as owned by the guest user
+  (root, `0:0`) by default rather than showing the raw host uid/gid. This avoids
+  ownership-sensitive tooling tripping up (e.g. git's "detected dubious
+  ownership") when host files are owned by a non-root user. Ownership can be
+  adjusted through a new mount/volume-level `owner` option, see below.
+
+## Features
+- Config: Mounts and volumes now accept an `owner: { uid?, gid? }` option to
+  control the uid/gid presented to the guest for that mount/volume's entries
+  (defaults to `guestUser`). Note that this does not change on-host ownership,
+  and files the guest creates still land on the host owned by the Tuor process
+  user. As before, invoking `chown` on mounted files & directories remains a
+  no-op.
 
 
 # 0.4.0 (2026-07-19)

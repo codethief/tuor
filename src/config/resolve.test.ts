@@ -276,6 +276,7 @@ describe("createSessionSpecFromConfig", () => {
         {
           guestPath: "/cache",
           stateDir: "/home/user/.tuor/.state/overlays/cache",
+          owner: { uid: 0, gid: 0 },
         },
       ]);
     });
@@ -404,6 +405,47 @@ describe("createSessionSpecFromConfig", () => {
         mounts: [{ hostPath: "/data", guestPath: "~/data", mode: "readonly" }],
       });
       expect(spec.mounts[0]!.guestPath).toBe("/custom/home/data");
+    });
+  });
+
+  describe("ownership", () => {
+    test("mount owner defaults to the guest user's uid/gid", () => {
+      const spec = resolve({
+        mounts: [{ hostPath: "/data", mode: "readonly" }],
+      });
+      expect(spec.mounts[0]!.owner).toEqual({ uid: 0, gid: 0 });
+    });
+
+    test("volume owner defaults to the guest user's uid/gid", () => {
+      const spec = resolve({ volumes: [{ guestPath: "/cache" }] });
+      expect(spec.volumes![0]!.owner).toEqual({ uid: 0, gid: 0 });
+    });
+
+    test("per-mount owner overrides the default", () => {
+      const spec = resolve({
+        mounts: [
+          {
+            hostPath: "/data",
+            mode: "readonly",
+            owner: { uid: 1000, gid: 1000 },
+          },
+        ],
+      });
+      expect(spec.mounts[0]!.owner).toEqual({ uid: 1000, gid: 1000 });
+    });
+
+    test("a partial per-mount owner inherits the missing field from the default", () => {
+      const spec = resolve({
+        mounts: [{ hostPath: "/data", mode: "readonly", owner: { uid: 1000 } }],
+      });
+      expect(spec.mounts[0]!.owner).toEqual({ uid: 1000, gid: 0 });
+    });
+
+    test("per-volume owner overrides the default", () => {
+      const spec = resolve({
+        volumes: [{ guestPath: "/cache", owner: { uid: 1000, gid: 1000 } }],
+      });
+      expect(spec.volumes![0]!.owner).toEqual({ uid: 1000, gid: 1000 });
     });
   });
 

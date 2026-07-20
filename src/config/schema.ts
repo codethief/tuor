@@ -121,6 +121,20 @@ const types = scope({
     "homedir?": "AbsolutePath",
   },
 
+  /**
+   * Ownership (numeric uid/gid) presented to the guest for a mount's or volume's
+   * entries. Each field is optional and falls back to the guest user's uid/gid
+   * (`guestUser`).
+   *
+   * This is display-only: it changes what the guest sees via stat(); it does not
+   * change on-host ownership.
+   */
+  OwnerConfig: {
+    "+": "reject",
+    "uid?": "number.integer >= 0",
+    "gid?": "number.integer >= 0",
+  },
+
   // --------------------------------------------------------------------------
   // Mounting & volumes, working directory
   // --------------------------------------------------------------------------
@@ -153,10 +167,20 @@ const types = scope({
      * Loaded once at boot; changes require VM restart.
      */
     "ignoreFileRefs?": "(string > 0)[]",
+    /**
+     * Ownership (uid/gid) presented to the guest for this mount's entries.
+     * Defaults to the guest user (`guestUser`). Display-only — see OwnerConfig.
+     */
+    "owner?": "OwnerConfig",
   },
   VolumeConfig: {
     "+": "reject",
     guestPath: "AbsolutePath | TildePath",
+    /**
+     * Ownership (uid/gid) presented to the guest for this volume's entries.
+     * Defaults to the guest user (`guestUser`). Display-only — see OwnerConfig.
+     */
+    "owner?": "OwnerConfig",
   },
   /**
    * Working directory inside the guest. Either just a guest path (string) to cd
@@ -302,6 +326,7 @@ const types = scope({
 }).export();
 
 export type GuestUserConfig = typeof types.GuestUserConfig.infer;
+export type OwnerConfig = typeof types.OwnerConfig.infer;
 export type VolumeConfig = typeof types.VolumeConfig.infer;
 export type MountConfig = typeof types.MountConfig.infer;
 export type NixConfig = typeof types.NixConfig.infer;

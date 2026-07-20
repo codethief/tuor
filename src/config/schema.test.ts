@@ -109,6 +109,26 @@ describe("parseConfig", () => {
     ).toThrow();
   });
 
+  test("accepts a per-mount owner", () => {
+    const config = parseConfig({
+      mounts: [{ hostPath: "/data", owner: { uid: 1000, gid: 1000 } }],
+    });
+    expect(config.mounts![0]!.owner).toEqual({ uid: 1000, gid: 1000 });
+  });
+
+  test("accepts a per-volume owner", () => {
+    const config = parseConfig({
+      volumes: [{ guestPath: "/cache", owner: { uid: 1000 } }],
+    });
+    expect(config.volumes![0]!.owner).toEqual({ uid: 1000 });
+  });
+
+  test("rejects a negative owner uid", () => {
+    expect(() =>
+      parseConfig({ mounts: [{ hostPath: "/data", owner: { uid: -1 } }] }),
+    ).toThrow();
+  });
+
   test("parses mount with ignore list", () => {
     const config = parseConfig({
       mounts: [{ hostPath: "/data", ignore: [".env", ".git"] }],
