@@ -21,7 +21,7 @@ describe("findConfigDir", () => {
 describe("parseConfig", () => {
   test("parses a fully-populated config with correct defaults", () => {
     const raw = {
-      user: "dev",
+      guestUser: { uid: 0, gid: 0 },
       network: { mode: "restricted", allowedHosts: ["*.github.com"] },
       workdir: { hostPath: "/host/project", guestPath: "/workspace" },
       mounts: [
@@ -35,7 +35,7 @@ describe("parseConfig", () => {
     };
     const config = parseConfig(raw);
     expect(config).toMatchObject({
-      user: "dev",
+      guestUser: { uid: 0, gid: 0 },
       network: { mode: "restricted", allowedHosts: ["*.github.com"] },
       workdir: {
         hostPath: "/host/project",
@@ -54,10 +54,10 @@ describe("parseConfig", () => {
   });
 
   test("leaves optional fields unset for minimal config", () => {
-    // user/workdir carry no schema default (they're defaulted post-merge in
+    // guestUser/workdir carry no schema default (they're defaulted post-merge in
     // applyConfigDefaults), so parseConfig leaves them undefined here.
     const config = parseConfig({});
-    expect(config.user).toBeUndefined();
+    expect(config.guestUser).toBeUndefined();
     expect(config.workdir).toBeUndefined();
     expect(config.network).toBeUndefined();
     expect(config.mounts).toBeUndefined();
@@ -94,6 +94,17 @@ describe("parseConfig", () => {
   test("omits guestHomeDir when not specified", () => {
     const config = parseConfig({});
     expect(config.guestHomeDir).toBeUndefined();
+  });
+
+  test("accepts guestUser { uid: 0, gid: 0 }", () => {
+    const config = parseConfig({ guestUser: { uid: 0, gid: 0 } });
+    expect(config.guestUser).toEqual({ uid: 0, gid: 0 });
+  });
+
+  test("rejects a non-root guestUser", () => {
+    expect(() =>
+      parseConfig({ guestUser: { uid: 1000, gid: 1000 } }),
+    ).toThrow();
   });
 
   test("parses mount with ignore list", () => {

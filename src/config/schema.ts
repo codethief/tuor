@@ -27,8 +27,7 @@ const types = scope({
 
     /**
      * Override the assumed guest user home directory (used for ~ expansion in
-     * guestPaths). Defaults to /root when config.user = root, /home/$user
-     * otherwise.
+     * guestPaths). Defaults to /root (only root is supported for now).
      */
     "guestHomeDir?": "AbsolutePath",
 
@@ -58,15 +57,9 @@ const types = scope({
     "resources?": "ResourcesConfig",
 
     /**
-     * The user to open the shell under and to make mounted directories
-     * available for. Must currently be root due to Gondolin-related
-     * constraints.
-     *
-     * Optional (no schema default): the "root" default is applied post-merge in
-     * applyConfigDefaults, so an inherited value isn't clobbered by a child
-     * layer that merely omitted the field.
+     * The user (as numeric uid/gid) that the guest shell runs under.
      */
-    "user?": "string > 0",
+    "guestUser?": "GuestUserConfig",
 
     /**
      * Volumes are host-backed, initially empty directories that the VM guest
@@ -114,6 +107,20 @@ const types = scope({
   },
   /** An env var value: a literal/interpolated string, host-sourced, or a secret. */
   EnvValue: "string | EnvSecret | EnvFromHost",
+
+  // --------------------------------------------------------------------------
+  // Guest user
+  // --------------------------------------------------------------------------
+
+  /**
+   * The user the guest shell runs under, as numeric uid/gid. Enforced to root
+   * (`{ uid: 0, gid: 0 }`) for now.
+   */
+  GuestUserConfig: {
+    "+": "reject",
+    uid: "0",
+    gid: "0",
+  },
 
   // --------------------------------------------------------------------------
   // Mounting & volumes, working directory
@@ -295,6 +302,7 @@ const types = scope({
   },
 }).export();
 
+export type GuestUserConfig = typeof types.GuestUserConfig.infer;
 export type VolumeConfig = typeof types.VolumeConfig.infer;
 export type MountConfig = typeof types.MountConfig.infer;
 export type NixConfig = typeof types.NixConfig.infer;

@@ -1,11 +1,12 @@
 import type { NetworkSpec } from "../core/session.ts";
-import { inferGuestHomeDir } from "./homedir.ts";
-import type { TuorConfig, WorkdirConfig } from "./schema.ts";
+import type { GuestUserConfig, TuorConfig, WorkdirConfig } from "./schema.ts";
 
 // --- Types ---
 
-/** Guest user assumed when no config layer sets one. */
-export const DEFAULT_USER = "root";
+/** Guest user assumed when no config layer sets one (root). */
+export const DEFAULT_GUEST_USER: GuestUserConfig = { uid: 0, gid: 0 };
+/** Guest home directory assumed when no config layer sets one. */
+export const DEFAULT_GUEST_HOME_DIR = "/root";
 /** Guest working directory assumed when no config layer sets one. */
 export const DEFAULT_WORKDIR: WorkdirConfig = "/";
 
@@ -22,11 +23,11 @@ export const DEFAULT_WORKDIR: WorkdirConfig = "/";
  */
 export type DefaultedConfig = Omit<
   TuorConfig,
-  "network" | "guestHomeDir" | "user" | "workdir"
+  "network" | "guestHomeDir" | "guestUser" | "workdir"
 > & {
   network: NetworkSpec;
   guestHomeDir: string;
-  user: string;
+  guestUser: GuestUserConfig;
   workdir: WorkdirConfig;
 };
 
@@ -34,10 +35,10 @@ export type DefaultedConfig = Omit<
 
 /**
  * Fill the config-level defaults that don't come from the arktype schema:
- * `user`, `workdir`, `network` (block-all when omitted) and `guestHomeDir`
- * (inferred from `user`).
+ * `guestUser`, `workdir`, `network` (block-all when omitted) and `guestHomeDir`
+ * (hard-coded `/root` — only root is supported for now).
  *
- * `user`/`workdir` are defaulted *here* rather than in the schema so that a
+ * `guestUser`/`workdir` are defaulted *here* rather than in the schema so that a
  * child config layer that omits them doesn't clobber a value inherited from a
  * parent layer during merge (their "omitted" would otherwise be indistinguish-
  * able from an explicit default). This must run after `mergeConfigs`.
@@ -48,13 +49,12 @@ export type DefaultedConfig = Omit<
  * defaults and stay in {@link createSessionSpecFromConfig}.
  */
 export function applyConfigDefaults(config: TuorConfig): DefaultedConfig {
-  const user = config.user ?? DEFAULT_USER;
   return {
     ...config,
-    user,
+    guestUser: config.guestUser ?? DEFAULT_GUEST_USER,
     workdir: config.workdir ?? DEFAULT_WORKDIR,
     network: defaultNetwork(config.network),
-    guestHomeDir: config.guestHomeDir ?? inferGuestHomeDir(user),
+    guestHomeDir: config.guestHomeDir ?? DEFAULT_GUEST_HOME_DIR,
   };
 }
 

@@ -45,7 +45,6 @@ export type ResourcesSpec = {
 
 /** Core's top-level input contract — everything the session needs to run. */
 export type SessionSpec = {
-  user: string;
   workdir: string;
   network: NetworkSpec;
   mounts: MountSpec[];
@@ -107,12 +106,13 @@ export async function runSession(
   } else {
     console.log("Spawning shell…");
   }
-  // `su myuser` gives us an interactive non-login shell (`su - myuser` would
-  // give us a login shell but would also cd into the user's home dir, messing
-  // with the cwd we configure below.)
+  // Run directly as root — Gondolin's default exec user — with the guest init
+  // environment (HOME=/root, PATH, …). Only root is supported for now, so
+  // there's no user to `su` into; $USER/$LOGNAME are left unset (`id`/`whoami`
+  // still report root). cwd is set explicitly below.
   const shellCommand = command
-    ? ["su", spec.user, "-c", command.join(" ")]
-    : ["su", spec.user];
+    ? ["/bin/sh", "-c", command.join(" ")]
+    : ["/bin/sh", "-i"];
   await vm.shell({
     attach: true,
     command: shellCommand,

@@ -111,7 +111,6 @@ export function createSessionSpecFromConfig(
   const resources = resolveResources(config.resources);
 
   return {
-    user: config.user,
     workdir: guestWorkdir,
     network: config.network,
     mounts: allMounts,

@@ -106,8 +106,10 @@ that is not set on the host is an error.
     // volumes, instead!)
     "rootfsSize": "2G"
   },
-  // Constraint: Guest user must currently be root
-  "user": "root",
+  // Guest user (numeric uid/gid) the shell runs under and that mounted
+  // directories are presented as owned by.
+  // Constraint: must currently be root ({ uid: 0, gid: 0 }).
+  "guestUser": { "uid": 0, "gid": 0 },
   // Persistent guest directories without a host backing directory (
   // similar to Docker volumes)
   "volumes": [

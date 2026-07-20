@@ -3,32 +3,36 @@ import { applyConfigDefaults } from "./defaults.ts";
 import type { TuorConfig } from "./schema.ts";
 
 /**
- * A merged config as it reaches applyConfigDefaults: user/workdir are optional
- * (no schema default) and only present when a layer set them explicitly.
+ * A merged config as it reaches applyConfigDefaults: guestUser/workdir are
+ * optional (no schema default) and only present when a layer set them
+ * explicitly.
  */
 function config(overrides: Partial<TuorConfig> = {}): TuorConfig {
   return { ...overrides };
 }
 
 describe("applyConfigDefaults", () => {
-  describe("user / workdir", () => {
-    test("defaults user to root when omitted", () => {
-      expect(applyConfigDefaults(config()).user).toBe("root");
+  describe("guestUser / workdir", () => {
+    test("defaults guestUser to root (uid/gid 0) when omitted", () => {
+      expect(applyConfigDefaults(config()).guestUser).toEqual({
+        uid: 0,
+        gid: 0,
+      });
     });
 
     test("defaults workdir to / when omitted", () => {
       expect(applyConfigDefaults(config()).workdir).toBe("/");
     });
 
-    test("preserves an explicit user and workdir", () => {
+    test("preserves an explicit guestUser and workdir", () => {
       const result = applyConfigDefaults(
-        config({ user: "dev", workdir: "/w" }),
+        config({ guestUser: { uid: 0, gid: 0 }, workdir: "/w" }),
       );
-      expect(result.user).toBe("dev");
+      expect(result.guestUser).toEqual({ uid: 0, gid: 0 });
       expect(result.workdir).toBe("/w");
     });
 
-    test("infers guestHomeDir from the defaulted user when user is omitted", () => {
+    test("defaults guestHomeDir to /root when omitted", () => {
       expect(applyConfigDefaults(config()).guestHomeDir).toBe("/root");
     });
   });
@@ -61,14 +65,9 @@ describe("applyConfigDefaults", () => {
   });
 
   describe("guestHomeDir", () => {
-    test("infers /root for the root user when omitted", () => {
-      const result = applyConfigDefaults(config({ user: "root" }));
+    test("defaults to /root when omitted", () => {
+      const result = applyConfigDefaults(config());
       expect(result.guestHomeDir).toBe("/root");
-    });
-
-    test("infers /home/<user> for a non-root user when omitted", () => {
-      const result = applyConfigDefaults(config({ user: "dev" }));
-      expect(result.guestHomeDir).toBe("/home/dev");
     });
 
     test("preserves an explicit guestHomeDir", () => {
@@ -81,12 +80,12 @@ describe("applyConfigDefaults", () => {
 
   test("leaves other fields untouched", () => {
     const input = config({
-      user: "dev",
+      guestUser: { uid: 0, gid: 0 },
       workdir: "/work",
       resources: { rootfsSize: "2G" },
     });
     const result = applyConfigDefaults(input);
-    expect(result.user).toBe("dev");
+    expect(result.guestUser).toEqual({ uid: 0, gid: 0 });
     expect(result.workdir).toBe("/work");
     expect(result.resources).toEqual({ rootfsSize: "2G" });
   });
