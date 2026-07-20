@@ -107,9 +107,10 @@ that is not set on the host is an error.
     "rootfsSize": "2G"
   },
   // Guest user (numeric uid/gid) the shell runs under and that mounted
-  // directories are presented as owned by.
-  // Constraint: must currently be root ({ uid: 0, gid: 0 }).
-  "guestUser": { "uid": 0, "gid": 0 },
+  // directories are presented as owned by. `homedir` (optional, default /root)
+  // is the guest home directory used for `~` expansion in guest paths.
+  // Constraint: uid/gid must currently be root ({ uid: 0, gid: 0 }).
+  "guestUser": { "uid": 0, "gid": 0, "homedir": "/root" },
   // Persistent guest directories without a host backing directory (
   // similar to Docker volumes)
   "volumes": [

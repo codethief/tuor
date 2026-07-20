@@ -26,12 +26,6 @@ const types = scope({
     "env?": { "[string]": "EnvValue" },
 
     /**
-     * Override the assumed guest user home directory (used for ~ expansion in
-     * guestPaths). Defaults to /root (only root is supported for now).
-     */
-    "guestHomeDir?": "AbsolutePath",
-
-    /**
      * Mount existing host directories in the VM guest's file system.
      */
     "mounts?": "MountConfig[]",
@@ -120,6 +114,11 @@ const types = scope({
     "+": "reject",
     uid: "0",
     gid: "0",
+    /**
+     * Override the guest user's home directory (used for `~` expansion in guest
+     * paths). Defaults to /root (only root is supported for now).
+     */
+    "homedir?": "AbsolutePath",
   },
 
   // --------------------------------------------------------------------------
@@ -170,7 +169,7 @@ const types = scope({
   AbsolutePath: type("string > 0").matching(/^\//),
   /**
    * Path starting with ~ (bare "~" or "~/…"), expanded either on the host or on
-   * the guest (see config.guestHomeDir).
+   * the guest (see config.guestUser.homedir).
    */
   TildePath: type("string > 0").matching(/^~(\/|$)/),
 

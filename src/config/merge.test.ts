@@ -131,12 +131,20 @@ describe("mergeConfigs", () => {
       expect(result.workdir).toBe("/parent-dir");
     });
 
-    test("guestHomeDir: child overrides parent", () => {
+    test("guestUser.homedir: child overrides parent", () => {
       const result = mergeConfigs([
-        layer("/a", { guestHomeDir: "/old" }),
-        layer("/b", { guestHomeDir: "/new" }),
+        layer("/a", { guestUser: { uid: 0, gid: 0, homedir: "/old" } }),
+        layer("/b", { guestUser: { uid: 0, gid: 0, homedir: "/new" } }),
       ]);
-      expect(result.guestHomeDir).toBe("/new");
+      expect(result.guestUser?.homedir).toBe("/new");
+    });
+
+    test("guestUser.homedir: child inherits parent's when it omits homedir", () => {
+      const result = mergeConfigs([
+        layer("/a", { guestUser: { uid: 0, gid: 0, homedir: "/parent-home" } }),
+        layer("/b", { guestUser: { uid: 0, gid: 0 } }),
+      ]);
+      expect(result.guestUser?.homedir).toBe("/parent-home");
     });
 
     test("nix: child overrides parent", () => {
