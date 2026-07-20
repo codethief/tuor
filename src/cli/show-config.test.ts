@@ -3,9 +3,8 @@ import type { DefaultedConfig } from "../config/defaults.ts";
 import { redactSecrets } from "./show-config.ts";
 
 const baseConfig: DefaultedConfig = {
-  guestUser: { uid: 0, gid: 0 },
+  guestUser: { uid: 0, gid: 0, homedir: "/root" },
   workdir: "/workspace",
-  guestHomeDir: "/root",
   network: { mode: "restricted", allowedHosts: [], allowedInternalHosts: [] },
 };
 

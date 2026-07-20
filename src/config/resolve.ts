@@ -57,7 +57,7 @@ export function createSessionSpecFromConfig(
   hostHomeDir: string,
   deps: ResolveDeps = defaultResolveDeps,
 ): SessionSpec {
-  const guestHomeDir = config.guestHomeDir;
+  const guestHomeDir = config.guestUser.homedir;
 
   // Resolve workdir
   const { guestWorkdir, workdirMount } = resolveWorkdir(

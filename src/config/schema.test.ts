@@ -86,19 +86,21 @@ describe("parseConfig", () => {
     expect(config.mounts![0]!.hostPath).toBe("~/projects");
   });
 
-  test("accepts guestHomeDir override", () => {
-    const config = parseConfig({ guestHomeDir: "/custom/home" });
-    expect(config.guestHomeDir).toBe("/custom/home");
-  });
-
-  test("omits guestHomeDir when not specified", () => {
-    const config = parseConfig({});
-    expect(config.guestHomeDir).toBeUndefined();
-  });
-
   test("accepts guestUser { uid: 0, gid: 0 }", () => {
     const config = parseConfig({ guestUser: { uid: 0, gid: 0 } });
     expect(config.guestUser).toEqual({ uid: 0, gid: 0 });
+  });
+
+  test("accepts a guestUser.homedir override", () => {
+    const config = parseConfig({
+      guestUser: { uid: 0, gid: 0, homedir: "/custom/home" },
+    });
+    expect(config.guestUser?.homedir).toBe("/custom/home");
+  });
+
+  test("omits guestUser.homedir when not specified", () => {
+    const config = parseConfig({ guestUser: { uid: 0, gid: 0 } });
+    expect(config.guestUser?.homedir).toBeUndefined();
   });
 
   test("rejects a non-root guestUser", () => {

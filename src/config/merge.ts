@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { DEFAULT_IGNORE_FILE_REFS } from "./ignore-files.ts";
 import type {
+  GuestUserConfig,
   MountConfig,
   NetworkConfig,
   QemuConfig,
@@ -92,10 +93,12 @@ function mergeTwoConfigs(parent: TuorConfig, child: TuorConfig): TuorConfig {
     // genuinely undefined here — otherwise a child layer's silently-defaulted
     // value would clobber a value inherited from a parent layer. Their defaults
     // are applied post-merge in applyConfigDefaults.
-    ...lastDefined(child.guestUser, parent.guestUser, "guestUser"),
     ...lastDefined(child.workdir, parent.workdir, "workdir"),
-    ...lastDefined(child.guestHomeDir, parent.guestHomeDir, "guestHomeDir"),
     ...lastDefined(child.nix, parent.nix, "nix"),
+
+    // GuestUser: deep-merge each field (uid/gid/homedir), child field wins — so
+    // a child that omits homedir keeps the parent's.
+    ...mergeGuestUser(parent.guestUser, child.guestUser),
 
     // Qemu: deep-merge each variant, child field wins
     ...mergeQemu(parent.qemu, child.qemu),
@@ -173,6 +176,16 @@ function mergeNetwork(
       ),
     },
   };
+}
+
+function mergeGuestUser(
+  parentUser: GuestUserConfig | undefined,
+  childUser: GuestUserConfig | undefined,
+): { guestUser: GuestUserConfig } | Record<string, never> {
+  if (!parentUser && !childUser) return {} as Record<string, never>;
+  // Shallow merge: each field (uid/gid/homedir) is a scalar, child wins. A child
+  // that omits `homedir` leaves the key absent, so the parent's survives.
+  return { guestUser: { ...parentUser, ...childUser } as GuestUserConfig };
 }
 
 function mergeQemu(

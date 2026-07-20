@@ -107,7 +107,7 @@ describe("createSessionSpecFromConfig", () => {
 
     test("expands ~ in guestPath using guest home dir", () => {
       const spec = resolve({
-        guestHomeDir: "/home/bob",
+        guestUser: { uid: 0, gid: 0, homedir: "/home/bob" },
         mounts: [
           { hostPath: "/opt/data", guestPath: "~/data", mode: "readonly" },
         ],
@@ -258,7 +258,7 @@ describe("createSessionSpecFromConfig", () => {
 
     test("expands ~ in MountConfig workdir guestPath using guest home dir", () => {
       const spec = resolve({
-        guestHomeDir: "/home/bob",
+        guestUser: { uid: 0, gid: 0, homedir: "/home/bob" },
         workdir: {
           hostPath: "/host/project",
           guestPath: "~/project",
@@ -282,7 +282,7 @@ describe("createSessionSpecFromConfig", () => {
 
     test("expands tilde in guestPath using guest home dir", () => {
       const spec = resolve({
-        guestHomeDir: "/home/bob",
+        guestUser: { uid: 0, gid: 0, homedir: "/home/bob" },
         volumes: [{ guestPath: "~/data" }],
       });
       expect(spec.volumes![0]).toMatchObject({
@@ -391,16 +391,16 @@ describe("createSessionSpecFromConfig", () => {
   });
 
   describe("other fields", () => {
-    test("defaults guestHomeDir to /root for tilde expansion", () => {
+    test("defaults guestUser.homedir to /root for tilde expansion", () => {
       const spec = resolve({
         mounts: [{ hostPath: "/data", guestPath: "~/data", mode: "readonly" }],
       });
       expect(spec.mounts[0]!.guestPath).toBe("/root/data");
     });
 
-    test("uses explicit guestHomeDir override for tilde expansion", () => {
+    test("uses explicit guestUser.homedir override for tilde expansion", () => {
       const spec = resolve({
-        guestHomeDir: "/custom/home",
+        guestUser: { uid: 0, gid: 0, homedir: "/custom/home" },
         mounts: [{ hostPath: "/data", guestPath: "~/data", mode: "readonly" }],
       });
       expect(spec.mounts[0]!.guestPath).toBe("/custom/home/data");

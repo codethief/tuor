@@ -5,10 +5,17 @@ import type { GuestUserConfig, TuorConfig, WorkdirConfig } from "./schema.ts";
 
 /** Guest user assumed when no config layer sets one (root). */
 export const DEFAULT_GUEST_USER: GuestUserConfig = { uid: 0, gid: 0 };
-/** Guest home directory assumed when no config layer sets one. */
+/**
+ * Guest home directory assumed when no config layer sets `guestUser.homedir`.
+ * Since the guest user is enforced to be root (i.e. root is not just the
+ * default), we can hard-code /root here.
+ */
 export const DEFAULT_GUEST_HOME_DIR = "/root";
 /** Guest working directory assumed when no config layer sets one. */
 export const DEFAULT_WORKDIR: WorkdirConfig = "/";
+
+/** A {@link GuestUserConfig} with its `homedir` default materialized. */
+export type DefaultedGuestUser = GuestUserConfig & { homedir: string };
 
 /**
  * A {@link TuorConfig} with all *config-level* defaults materialized. This is
@@ -23,11 +30,10 @@ export const DEFAULT_WORKDIR: WorkdirConfig = "/";
  */
 export type DefaultedConfig = Omit<
   TuorConfig,
-  "network" | "guestHomeDir" | "guestUser" | "workdir"
+  "network" | "guestUser" | "workdir"
 > & {
   network: NetworkSpec;
-  guestHomeDir: string;
-  guestUser: GuestUserConfig;
+  guestUser: DefaultedGuestUser;
   workdir: WorkdirConfig;
 };
 
@@ -35,8 +41,7 @@ export type DefaultedConfig = Omit<
 
 /**
  * Fill the config-level defaults that don't come from the arktype schema:
- * `guestUser`, `workdir`, `network` (block-all when omitted) and `guestHomeDir`
- * (hard-coded `/root` — only root is supported for now).
+ * `guestUser`, `workdir`, and `network` (block-all when omitted).
  *
  * `guestUser`/`workdir` are defaulted *here* rather than in the schema so that a
  * child config layer that omits them doesn't clobber a value inherited from a
@@ -49,12 +54,15 @@ export type DefaultedConfig = Omit<
  * defaults and stay in {@link createSessionSpecFromConfig}.
  */
 export function applyConfigDefaults(config: TuorConfig): DefaultedConfig {
+  const guestUser = config.guestUser ?? DEFAULT_GUEST_USER;
   return {
     ...config,
-    guestUser: config.guestUser ?? DEFAULT_GUEST_USER,
+    guestUser: {
+      ...guestUser,
+      homedir: guestUser.homedir ?? DEFAULT_GUEST_HOME_DIR,
+    },
     workdir: config.workdir ?? DEFAULT_WORKDIR,
     network: defaultNetwork(config.network),
-    guestHomeDir: config.guestHomeDir ?? DEFAULT_GUEST_HOME_DIR,
   };
 }
 

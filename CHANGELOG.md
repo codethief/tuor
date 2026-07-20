@@ -7,6 +7,8 @@
 - The guest shell is now `/bin/bash`, previously was root's default shell (= ash
   in Gondolin's Alpine base image). Using bash matches the default command
   in Gondolin's `VM.shell()`.
+- Config: the top-level `guestHomeDir` moved into `guestUser` as
+  `guestUser.homedir`. Update configs that set `guestHomeDir`.
 
 
 # 0.4.0 (2026-07-19)
