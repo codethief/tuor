@@ -1,5 +1,8 @@
 # Unreleased
 
+
+# 0.5.0 (2026-07-24)
+
 ## Breaking changes
 - Config: the guest user is now configured as `guestUser: { uid, gid }` (numeric)
   instead of the `user: "<name>"` string. It must currently be
