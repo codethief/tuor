@@ -10,6 +10,7 @@ import {
   type VirtualProvider,
   VirtualProviderClass,
 } from "@earendil-works/gondolin";
+import type { MaybeClosable } from "./vfs-types.ts";
 
 // --- Constants ---
 
@@ -30,10 +31,13 @@ export class OverlayProvider
   extends (VirtualProviderClass as new () => Record<string, unknown>)
   implements VirtualProvider
 {
-  private readonly lower: VirtualProvider;
-  private readonly upper: VirtualProvider;
+  private readonly lower: VirtualProvider & MaybeClosable;
+  private readonly upper: VirtualProvider & MaybeClosable;
 
-  constructor(lower: VirtualProvider, upper: VirtualProvider) {
+  constructor(
+    lower: VirtualProvider & MaybeClosable,
+    upper: VirtualProvider & MaybeClosable,
+  ) {
     super();
     this.lower = lower;
     this.upper = upper;
@@ -433,12 +437,8 @@ export class OverlayProvider
   }
 
   async close() {
-    const upperClose = (this.upper as { close?: () => Promise<void> | void })
-      .close;
-    const lowerClose = (this.lower as { close?: () => Promise<void> | void })
-      .close;
-    if (upperClose) await upperClose.call(this.upper);
-    if (lowerClose) await lowerClose.call(this.lower);
+    if (this.upper.close) await this.upper.close();
+    if (this.lower.close) await this.lower.close();
   }
 
   // --- Private: open helpers ---

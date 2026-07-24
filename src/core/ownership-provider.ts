@@ -5,6 +5,7 @@ import {
   type VirtualProvider,
   VirtualProviderClass,
 } from "@earendil-works/gondolin";
+import type { MaybeClosable } from "./vfs-types.ts";
 
 // --- Public API ---
 
@@ -27,10 +28,10 @@ export class OwnershipProvider
   extends VirtualProviderClass
   implements VirtualProvider
 {
-  private readonly backend: VirtualProvider;
+  private readonly backend: VirtualProvider & MaybeClosable;
   private readonly owner: Owner;
 
-  constructor(backend: VirtualProvider, owner: Owner) {
+  constructor(backend: VirtualProvider & MaybeClosable, owner: Owner) {
     super();
     this.backend = backend;
     this.owner = owner;
@@ -234,9 +235,8 @@ export class OwnershipProvider
   }
 
   async close() {
-    const backend = this.backend as { close?: () => Promise<void> | void };
-    if (backend.close) {
-      await backend.close();
+    if (this.backend.close) {
+      await this.backend.close();
     }
   }
 }
