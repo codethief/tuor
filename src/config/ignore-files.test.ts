@@ -280,6 +280,57 @@ describe("collectIgnorePatterns", () => {
     }
   });
 
+  test("excludes the state dir reached via an aliased (symlinked) config dir", () => {
+    const mounted_workspace = mkdtempSync(
+      join(tmpdir(), "tuor-statedir-alias-"),
+    );
+    try {
+      // A user-defined ignore file at the mount root that must still be collected.
+      writeFileSync(
+        join(mounted_workspace, ".tuorignore"),
+        "user-ignore-pattern",
+      );
+
+      // Imagine mounting a multi-repo workspace into the guest. The workspace's
+      // /.tuor dir is a symlink to /tuor-config-repo/.tuor. So the state dir
+      // /.tuor/.state is *also* reachable via the un-aliased real path
+      // /tuor-config-repo/.tuor/.state. Here we test that the state dir is
+      // ignored when looking for ignore files, no matter how it can be reached.
+      const realState = join(
+        mounted_workspace,
+        "tuor-config-repo",
+        ".tuor",
+        ".state",
+        "overlays",
+        "root",
+      );
+      mkdirSync(realState, { recursive: true });
+
+      // An ignore file inside the state dir, which should be ignored.
+      writeFileSync(
+        join(realState, ".tuorignore"),
+        "this-ignore-file-should-not-be-parsed",
+      );
+
+      // Symlink /.tuor -> /tuor-config-repo/.tuor
+      symlinkSync(
+        join("tuor-config-repo", ".tuor"),
+        join(mounted_workspace, ".tuor"),
+      );
+
+      const refs = [parseIgnoreFileRef("mount:.tuorignore")];
+      const result = collectIgnorePatterns(
+        refs,
+        mounted_workspace,
+        join(mounted_workspace, ".tuor"),
+        defaultIgnoreFileDeps,
+      );
+      expect(result).toEqual([{ pattern: "user-ignore-pattern", scope: "/" }]);
+    } finally {
+      rmSync(mounted_workspace, { recursive: true });
+    }
+  });
+
   test("merges patterns from multiple refs", () => {
     const deps: IgnoreFileDeps = {
       readFile: (p) => {

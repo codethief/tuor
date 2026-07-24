@@ -148,10 +148,28 @@ function walkFilesRecursive(
   excludeDirs: ReadonlySet<string> = new Set(),
 ): string[] {
   const results: string[] = [];
+
+  // Exclude directories by *physical identity*, not by path string: the same
+  // directory might be reachable under multiple names when a symlink aliases
+  // one of its ancestors. This case can occur, e.g., when mounting a multi-repo
+  // workspace, whose `/.tuor` folder is a symlink to some
+  // `/tuor-config-repo/.tuor` that's also part of the workspace.
+  //
+  // Resolving to the canonical path lets us skip the excluded dir no matter
+  // which alias the walk arrives through. Excluded dirs that don't resolve
+  // simply can't be hit, so drop them.
+  const excludeReal = new Set<string>();
+  for (const d of excludeDirs) {
+    try {
+      excludeReal.add(realpathSync(d));
+    } catch {
+      // not present on disk → unreachable by the walk
+    }
+  }
+
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = join(dir, entry.name);
-      if (excludeDirs.has(full)) continue;
       if (entry.isSymbolicLink()) {
         // statSync follows the link to its target. A dangling symlink (target
         // missing) throws ENOENT, so guard against it and skip rather than
@@ -164,6 +182,7 @@ function walkFilesRecursive(
         }
         if (!isDir) continue;
         const real = realpathSync(full);
+        if (excludeReal.has(real)) continue;
         if (dir.startsWith(real + "/") || dir === real) {
           throw new Error(
             `Symlink cycle detected while scanning for ${filename}: ` +
@@ -173,6 +192,13 @@ function walkFilesRecursive(
         }
         walk(full);
       } else if (entry.isDirectory()) {
+        let real: string;
+        try {
+          real = realpathSync(full);
+        } catch {
+          continue;
+        }
+        if (excludeReal.has(real)) continue;
         walk(full);
       } else if (entry.name === filename) {
         results.push(full);
