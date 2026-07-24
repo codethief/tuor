@@ -67,6 +67,7 @@ Run `npx tuor-sandbox --help` to explore the CLI.
 - [Installation](./docs/Installation.md)
 - [CLI](./docs/CLI.md)
 - [Configuration](./docs/Configuration.md)
+- [Limitations & known issues](./docs/Limitations%20&%20known%20issues.md)
 - [Development](./docs/Development.md)
 - [FAQ](./docs/FAQ.md)
 
