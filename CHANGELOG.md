@@ -1,5 +1,21 @@
 # Unreleased
 
+## Bug fixes
+- Config: When loading ignore files for a mounted directory, don't descend into
+  the Tuor state dir if it is reachable under a symlink within the mounted
+  directory. This case can occur, e.g., when mounting a multi-repo workspace,
+  whose `/.tuor` folder is a symlink to some `/tuor-config-repo/.tuor` that's
+  also part of the mounted workspace. Reading the state dir on the host might
+  prevent the VM from starting if, in a previous session, the guest created
+  symlinks in some overlay mount and these symlinks, when interpreted on the
+  host, cannot be followed. (For instance, a symlink to the guest's `/root`
+  cannot (and also should not) be followed on the host while Tuor is running as
+  non-root user.) In this case, the ignore file loader would previously throw an
+  exception (permission denied), even though it shouldn't have walked the
+  symlinked state dir in the first place. To fix this, always resolve symlinks
+  to real paths first when searching mounted directories for ignore files and
+  applying excludes (like the state dir).
+
 
 # 0.5.0 (2026-07-24)
 
