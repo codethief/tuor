@@ -1,5 +1,8 @@
 # Unreleased
 
+
+# 0.5.1 (2026-08-03)
+
 ## Bug fixes
 - Config: When loading ignore files for a mounted directory, don't descend into
   the Tuor state dir if it is reachable under a symlink within the mounted
