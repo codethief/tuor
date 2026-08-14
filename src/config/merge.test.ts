@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { type ConfigLayer, findAllConfigDirs, mergeConfigs } from "./merge.ts";
-import type { MountConfig, TuorConfig } from "./schema.ts";
+import {
+  type MountConfig,
+  parseConfig,
+  type RootfsImageConfig,
+  type TuorConfig,
+} from "./schema.ts";
 
 /**
  * Minimal valid config, matching what parseConfig returns: user/workdir carry
@@ -23,6 +28,17 @@ function mount(
   overrides: Partial<MountConfig> & { hostPath: string },
 ): MountConfig {
   return { mode: "readonly", ...overrides };
+}
+
+/** Rootfs image with its required policy defaults. */
+function withPolicyDefaults(
+  overrides: Partial<RootfsImageConfig> & { ref: string },
+): RootfsImageConfig {
+  return {
+    pullPolicy: "if-not-present",
+    buildPolicy: "if-not-present",
+    ...overrides,
+  };
 }
 
 describe("findAllConfigDirs", () => {
@@ -429,17 +445,17 @@ describe("mergeConfigs", () => {
     test("distinct fields across layers are combined", () => {
       const result = mergeConfigs([
         layer("/a", { resources: { memory: "1G" } }),
-        layer("/b", { resources: { rootfsSize: "4G" } }),
+        layer("/b", { resources: { cpus: 4 } }),
       ]);
-      expect(result.resources).toEqual({ memory: "1G", rootfsSize: "4G" });
+      expect(result.resources).toEqual({ memory: "1G", cpus: 4 });
     });
 
-    test("child rootfsSize overrides parent", () => {
+    test("child memory overrides parent", () => {
       const result = mergeConfigs([
-        layer("/a", { resources: { rootfsSize: "1G" } }),
-        layer("/b", { resources: { rootfsSize: "4G" } }),
+        layer("/a", { resources: { memory: "1G" } }),
+        layer("/b", { resources: { memory: "4G" } }),
       ]);
-      expect(result.resources).toEqual({ rootfsSize: "4G" });
+      expect(result.resources).toEqual({ memory: "4G" });
     });
 
     test("parent resources used when child has none", () => {
@@ -453,6 +469,101 @@ describe("mergeConfigs", () => {
     test("no resources when neither layer has it", () => {
       const result = mergeConfigs([layer("/a"), layer("/b")]);
       expect(result.resources).toBeUndefined();
+    });
+  });
+
+  describe("rootfs: field merge, atomic image", () => {
+    test("parent rootfs used when child has none", () => {
+      const result = mergeConfigs([
+        layer("/a", {
+          rootfs: { image: withPolicyDefaults({ ref: "debian:trixie" }) },
+        }),
+        layer("/b"),
+      ]);
+      expect(result.rootfs).toEqual({
+        image: withPolicyDefaults({ ref: "debian:trixie" }),
+      });
+    });
+
+    test("child rootfs used when parent has none", () => {
+      const result = mergeConfigs([
+        layer("/a"),
+        layer("/b", { rootfs: { size: "8G" } }),
+      ]);
+      expect(result.rootfs).toEqual({ size: "8G" });
+    });
+
+    test("no rootfs when neither layer has it", () => {
+      const result = mergeConfigs([layer("/a"), layer("/b")]);
+      expect(result.rootfs).toBeUndefined();
+    });
+
+    test("child size overrides parent size", () => {
+      const result = mergeConfigs([
+        layer("/a", { rootfs: { size: "2G" } }),
+        layer("/b", { rootfs: { size: "8G" } }),
+      ]);
+      expect(result.rootfs).toEqual({ size: "8G" });
+    });
+
+    test("child size keeps the parent's image", () => {
+      const result = mergeConfigs([
+        layer("/a", {
+          rootfs: { image: withPolicyDefaults({ ref: "debian:trixie" }) },
+        }),
+        layer("/b", { rootfs: { size: "8G" } }),
+      ]);
+      expect(result.rootfs).toEqual({
+        image: withPolicyDefaults({ ref: "debian:trixie" }),
+        size: "8G",
+      });
+    });
+
+    test("child image replaces the parent's entirely", () => {
+      const result = mergeConfigs([
+        layer("/a", {
+          rootfs: {
+            image: withPolicyDefaults({
+              ref: "debian:trixie",
+              engine: "podman",
+            }),
+          },
+        }),
+        layer("/b", {
+          rootfs: { image: withPolicyDefaults({ ref: "alpine:3.23" }) },
+        }),
+      ]);
+      // `engine` is *not* inherited: `image` is atomic, so re-pointing `ref`
+      // means re-stating everything else you want with it.
+      expect(result.rootfs?.image).toEqual(
+        withPolicyDefaults({ ref: "alpine:3.23" }),
+      );
+    });
+
+    /**
+     * Goes through `parseConfig` per layer, as load.ts does, so the child's
+     * `pullPolicy` default is materialized before the merge. Since `image` is
+     * atomic, that default replaces the parent's explicit value rather than
+     * being interleaved with it.
+     */
+    test("child image drops the parent's explicit pullPolicy", () => {
+      const result = mergeConfigs([
+        {
+          config: parseConfig({
+            rootfs: { image: { ref: "debian:trixie", pullPolicy: "always" } },
+          }),
+          configDir: "/a",
+        },
+        {
+          config: parseConfig({ rootfs: { image: { ref: "alpine:3.23" } } }),
+          configDir: "/b",
+        },
+      ]);
+      expect(result.rootfs?.image).toEqual({
+        ref: "alpine:3.23",
+        pullPolicy: "if-not-present",
+        buildPolicy: "if-not-present",
+      });
     });
   });
 

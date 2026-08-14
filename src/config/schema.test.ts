@@ -369,14 +369,13 @@ describe("parseConfig", () => {
   });
 
   describe("resources config", () => {
-    test("accepts memory, cpus and rootfsSize", () => {
+    test("accepts memory and cpus", () => {
       const config = parseConfig({
-        resources: { memory: "2G", cpus: 4, rootfsSize: "8G" },
+        resources: { memory: "2G", cpus: 4 },
       });
       expect(config.resources).toEqual({
         memory: "2G",
         cpus: 4,
-        rootfsSize: "8G",
       });
     });
 
@@ -396,6 +395,95 @@ describe("parseConfig", () => {
     });
   });
 
+  describe("rootfs config", () => {
+    test("accepts an image with just a ref", () => {
+      const config = parseConfig({
+        rootfs: { image: { ref: "docker.io/library/debian:bookworm-slim" } },
+      });
+      expect(config.rootfs).toEqual({
+        image: {
+          ref: "docker.io/library/debian:bookworm-slim",
+          pullPolicy: "if-not-present",
+          buildPolicy: "if-not-present",
+        },
+      });
+    });
+
+    test("defaults an omitted pullPolicy to if-not-present", () => {
+      const config = parseConfig({ rootfs: { image: { ref: "alpine:3.23" } } });
+      expect(config.rootfs?.image?.pullPolicy).toBe("if-not-present");
+    });
+
+    test("defaults an omitted buildPolicy to if-not-present", () => {
+      const config = parseConfig({ rootfs: { image: { ref: "alpine:3.23" } } });
+      expect(config.rootfs?.image?.buildPolicy).toBe("if-not-present");
+    });
+
+    test.each([
+      "if-not-present",
+      "always",
+    ])("accepts an explicit buildPolicy: %s", (buildPolicy) => {
+      const config = parseConfig({
+        rootfs: { image: { ref: "alpine:3.23", buildPolicy } },
+      });
+      expect(config.rootfs?.image?.buildPolicy).toBe(buildPolicy);
+    });
+
+    test("rejects buildPolicy 'never'", () => {
+      expect(() =>
+        parseConfig({
+          rootfs: { image: { ref: "alpine:3.23", buildPolicy: "never" } },
+        }),
+      ).toThrow();
+    });
+
+    test.each([
+      "if-not-present",
+      "always",
+      "never",
+    ])("accepts an explicit pullPolicy: %s", (pullPolicy) => {
+      const config = parseConfig({
+        rootfs: { image: { ref: "alpine:3.23", pullPolicy } },
+      });
+      expect(config.rootfs?.image?.pullPolicy).toBe(pullPolicy);
+    });
+
+    test.each(["docker", "podman"])("accepts engine: %s", (engine) => {
+      const config = parseConfig({
+        rootfs: { image: { ref: "alpine:3.23", engine } },
+      });
+      expect(config.rootfs?.image?.engine).toBe(engine);
+    });
+
+    test("accepts a size alongside an image", () => {
+      const config = parseConfig({
+        rootfs: { image: { ref: "alpine:3.23" }, size: "8G" },
+      });
+      expect(config.rootfs).toEqual({
+        image: {
+          ref: "alpine:3.23",
+          pullPolicy: "if-not-present",
+          buildPolicy: "if-not-present",
+        },
+        size: "8G",
+      });
+    });
+
+    test("accepts a bare size without an image", () => {
+      const config = parseConfig({ rootfs: { size: "512M" } });
+      expect(config.rootfs).toEqual({ size: "512M" });
+    });
+
+    test.each(["512M", "8g", "1T", "1048576K"])("accepts size: %s", (size) => {
+      expect(parseConfig({ rootfs: { size } }).rootfs).toEqual({ size });
+    });
+
+    test("omits rootfs when not specified", () => {
+      const config = parseConfig({});
+      expect(config.rootfs).toBeUndefined();
+    });
+  });
+
   test.each([
     ["qemu unknown field", { qemu: { foo: "bar" } }],
     ["qemu empty accel", { qemu: { accel: "" } }],
@@ -406,6 +494,26 @@ describe("parseConfig", () => {
     ["resources non-integer cpus", { resources: { cpus: 1.5 } }],
     ["resources zero cpus", { resources: { cpus: 0 } }],
     ["resources non-number cpus", { resources: { cpus: "4" } }],
+    ["rootfs unknown field", { rootfs: { foo: "bar" } }],
+    ["rootfs image without ref", { rootfs: { image: { engine: "docker" } } }],
+    ["rootfs image empty ref", { rootfs: { image: { ref: "" } } }],
+    [
+      "rootfs image unknown field",
+      { rootfs: { image: { ref: "alpine", platform: "linux/amd64" } } },
+    ],
+    [
+      "rootfs image bad engine",
+      { rootfs: { image: { ref: "alpine", engine: "containerd" } } },
+    ],
+    [
+      "rootfs image bad pullPolicy",
+      { rootfs: { image: { ref: "alpine", pullPolicy: "sometimes" } } },
+    ],
+    ["rootfs malformed size", { rootfs: { size: "8GB" } }],
+    ["rootfs size with a space", { rootfs: { size: "8 G" } }],
+    ["rootfs empty size", { rootfs: { size: "" } }],
+    ["rootfs non-string size", { rootfs: { size: 8192 } }],
+    ["rootfs size without a unit suffix", { rootfs: { size: "2048" } }],
     [
       "relative guestPath",
       { mounts: [{ hostPath: "/foo", guestPath: "rel" }] },

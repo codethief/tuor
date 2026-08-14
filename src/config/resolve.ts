@@ -10,6 +10,7 @@ import { validateMounts } from "../core/mounts.ts";
 import type {
   QemuSpec,
   ResourcesSpec,
+  RootfsSpec,
   SecretSpec,
   SessionSpec,
 } from "../core/session.ts";
@@ -117,6 +118,7 @@ export function createSessionSpecFromConfig(
 
   const qemu = resolveQemu(config.qemu);
   const resources = resolveResources(config.resources);
+  const rootfs = resolveRootfs(config.rootfs);
 
   return {
     workdir: guestWorkdir,
@@ -124,6 +126,7 @@ export function createSessionSpecFromConfig(
     mounts: allMounts,
     ...(volumes.length > 0 ? { volumes } : {}),
     ...(resources ? { resources } : {}),
+    ...(rootfs ? { rootfs } : {}),
     ...(hasEnv ? { env: mergedEnv } : {}),
     ...(hasSecrets ? { secrets } : {}),
     ...(qemu ? { qemu } : {}),
@@ -270,6 +273,21 @@ function resolveResources(
 ): ResourcesSpec | undefined {
   if (!resources || Object.keys(resources).length === 0) return undefined;
   return { ...resources };
+}
+
+/**
+ * Pass the configured rootfs through verbatim. (Defaults have already been
+ * applied!)
+ *
+ * `size` stays the QEMU-syntax string here: whether it is baked into a built
+ * image (converted to MB) or grown at runtime is core's dispatch to make, in
+ * `runSession`.
+ */
+function resolveRootfs(
+  rootfs: DefaultedConfig["rootfs"],
+): RootfsSpec | undefined {
+  if (!rootfs || Object.keys(rootfs).length === 0) return undefined;
+  return { ...rootfs };
 }
 
 function resolveVolumeConfig(

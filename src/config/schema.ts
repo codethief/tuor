@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { scope, type } from "arktype";
+import { SIZE_FORMAT } from "../core/image.ts";
 
 const types = scope({
   // --------------------------------------------------------------------------
@@ -46,9 +47,14 @@ const types = scope({
     "qemu?": "QemuConfig",
 
     /**
-     * VM resource sizing (RAM, vCPU count, rootfs disk size).
+     * VM resource sizing (RAM, vCPU count).
      */
     "resources?": "ResourcesConfig",
+
+    /**
+     * Root filesystem configuration: base image and/or size.
+     */
+    "rootfs?": "RootfsConfig",
 
     /**
      * The user (as numeric uid/gid) that the guest shell runs under.
@@ -314,14 +320,109 @@ const types = scope({
      * from `QemuConfig.cpu` (the emulated CPU *model*)!
      */
     "cpus?": "number.integer >= 1",
+  },
+
+  // --------------------------------------------------------------------------
+  // Root filesystem
+  // --------------------------------------------------------------------------
+
+  /**
+   * Root filesystem: which image the guest boots from and how big its disk is.
+   *
+   * NOTE: This is Tuor's config type — it is distinct from Gondolin's own
+   * build-time `RootfsConfig` (`{ label, sizeMb }`) and from Gondolin's runtime
+   * `rootfs.{mode,size}` VM option, both of which it feeds into.
+   */
+  RootfsConfig: {
+    "+": "reject",
     /**
-     * Minimum virtual disk size for the rootfs (e.g. "2G", "512M"). The COW
-     * overlay will be grown to at least this size before boot. Actual host disk
-     * usage remains sparse (only written pages cost space). The config option
-     * maps to Gondolin's `rootfs.size` and defaults to the size of the base
-     * image used by Gondolin (no minimum growth).
+     * Source image for the guest rootfs. Omit to boot Gondolin's default
+     * `alpine-base` image.
      */
-    "rootfsSize?": "string > 0",
+    "image?": "RootfsImageConfig",
+    /**
+     * Target rootfs size in QEMU-compatible syntax: a positive integer with a
+     * *mandatory* K/M/G/T suffix, e.g. "512M", "8G".
+     *
+     * The setting will only ever grow the rootfs, never shrink it, and is
+     * applied at different stages, depending on `rootfs.image`:
+     * - No custom `image` set => The disk is *grown* at runtime (using Gondolin
+     *   `rootfs.size`), which requires `resize2fs` to be installed in the
+     *   guest. Note that this currently doesn't work due to
+     *   https://github.com/earendil-works/gondolin/issues/132
+     * - Custom `image` set => The size gets baked into the image at build time
+     *   (Gondolin `rootfs.sizeMb`), so no in-guest `resize2fs` is needed (which
+     *   minimal/distroless images typically lack).
+     *
+     * The filesystem is sparse either way, so a large (but mostly empty) rootfs
+     * won't take up more host disk space.
+     */
+    "size?": type("string > 0").matching(SIZE_FORMAT),
+  },
+  /**
+   * An optional OCI image to build the guest rootfs from. Essentially a config
+   * setting for https://earendil-works.github.io/gondolin/custom-images/ .
+   *
+   * Note that the choice of image doesn't affect the guest kernel which is
+   * always taken from Alpine.
+   *
+   * Tuor builds the VM image from the OCI image on first use and caches them in
+   * Gondolin's content-addressed image store (`~/.cache/gondolin/images`, or
+   * `$GONDOLIN_IMAGE_STORE`) under a `tuor/<hash>:latest` ref,  where `<hash>`
+   * covers the image ref, the architecture, `rootfs.size` and the Gondolin
+   * version. The caching can be fine-tuned using `buildPolicy` and
+   * `pullPolicy`, see below.
+   *
+   * Host requirements:
+   * - `cpio`
+   * - `lz4`
+   * - `mke2fs` or `mkfs.ext4`
+   * - `debugfs`
+   *
+   * On Debian/Ubuntu: `apt install cpio lz4 e2fsprogs`.
+   */
+  RootfsImageConfig: {
+    "+": "reject",
+    /**
+     * The OCI image to be used for the rootfs. The architecture is always the
+     * host's — cross-arch builds are not supported.
+     *
+     * Format: `repo/name[:tag]` or `repo/name@sha256:…`
+     */
+    ref: "string > 0",
+    /**
+     * Container engine used to pull & export the OCI image. Maps to Gondolin's
+     * `oci.runtime`. Omit to let Gondolin auto-detect (docker, else podman).
+     */
+    "engine?": "'docker' | 'podman'",
+    /**
+     * When to trigger a rebuild of the rootfs image from the OCI image. Allowed
+     * values:
+     *
+     * - always: rebuild the rootfs image every run. Combine with `pullPolicy`
+     *   to say where the image itself comes from — "always" to track a moving
+     *   tag, "never" to rebuild from whatever is in the local store.
+     * - if-not-present: build once per (ref, arch, size, gondolin version),
+     *   then reuse. Since `ref` — not the OCI image contents — is the cache
+     *   identity, a changed `:latest` tag in your engine's local image store
+     *   will *not* invalidate the VM build.
+     *
+     * Note that Tuor currently does not prune old images from Gondolin's image
+     * store, nor from Docker/Podman's.
+     */
+    buildPolicy: "'always' | 'if-not-present' = 'if-not-present'",
+    /**
+     * Whether to fetch `ref` fresh from its registry, for the runs on which
+     * Tuor actually builds the rootfs image (see `buildPolicy`). Maps to
+     * Gondolin's `oci.pullPolicy`. Allowed values:
+     *
+     * - always: pull afresh, so a mutable tag picks up its current contents.
+     * - if-not-present: pull only when the engine's local image store has no
+     *   `ref`. Mutable tags like `:latest` are not refreshed.
+     * - never: use the engine's local image store only, and fail if `ref` isn't
+     *   in it.
+     */
+    pullPolicy: "'always' | 'if-not-present' | 'never' = 'if-not-present'",
   },
 }).export();
 
@@ -332,6 +433,8 @@ export type MountConfig = typeof types.MountConfig.infer;
 export type NixConfig = typeof types.NixConfig.infer;
 export type QemuConfig = typeof types.QemuConfig.infer;
 export type ResourcesConfig = typeof types.ResourcesConfig.infer;
+export type RootfsConfig = typeof types.RootfsConfig.infer;
+export type RootfsImageConfig = typeof types.RootfsImageConfig.infer;
 export type NetworkConfig = typeof types.NetworkConfig.infer;
 export type EnvFromHost = typeof types.EnvFromHost.infer;
 export type EnvSecret = typeof types.EnvSecret.infer;

@@ -75,16 +75,28 @@ describe("applyConfigDefaults", () => {
     });
   });
 
+  describe("rootfs", () => {
+    test("leaves an absent rootfs absent (no empty object synthesized)", () => {
+      expect(applyConfigDefaults(config()).rootfs).toBeUndefined();
+    });
+
+    test("invents no image for a rootfs that only sets size", () => {
+      const result = applyConfigDefaults(config({ rootfs: { size: "8G" } }));
+      expect(result.rootfs).toEqual({ size: "8G" });
+      expect(result.rootfs && "image" in result.rootfs).toBe(false);
+    });
+  });
+
   test("leaves other fields untouched", () => {
     const input = config({
       guestUser: { uid: 0, gid: 0 },
       workdir: "/work",
-      resources: { rootfsSize: "2G" },
+      resources: { memory: "2G" },
     });
     const result = applyConfigDefaults(input);
     expect(result.guestUser).toEqual({ uid: 0, gid: 0, homedir: "/root" });
     expect(result.workdir).toBe("/work");
-    expect(result.resources).toEqual({ rootfsSize: "2G" });
+    expect(result.resources).toEqual({ memory: "2G" });
   });
 
   test("does not mutate the input config", () => {
