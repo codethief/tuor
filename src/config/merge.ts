@@ -7,6 +7,7 @@ import type {
   NetworkConfig,
   QemuConfig,
   ResourcesConfig,
+  RootfsConfig,
   TuorConfig,
 } from "./schema.ts";
 
@@ -89,7 +90,7 @@ export function mergeConfigs(layers: ConfigLayer[]): TuorConfig {
 function mergeTwoConfigs(parent: TuorConfig, child: TuorConfig): TuorConfig {
   return {
     // Scalars: child wins, falling back to parent when the child omits the
-    // field. guestUser/workdir carry no schema default anymore, so "omitted" is
+    // field. guestUser/workdir carry no schema default, so "omitted" is
     // genuinely undefined here — otherwise a child layer's silently-defaulted
     // value would clobber a value inherited from a parent layer. Their defaults
     // are applied post-merge in applyConfigDefaults.
@@ -105,6 +106,9 @@ function mergeTwoConfigs(parent: TuorConfig, child: TuorConfig): TuorConfig {
 
     // Resources: deep-merge each field, child field wins
     ...mergeResources(parent.resources, child.resources),
+
+    // Rootfs: merge field by field, child wins (`image` is atomic)
+    ...mergeRootfs(parent.rootfs, child.rootfs),
 
     // Arrays: concatenate
     ...mergeArrayField(parent.mounts, child.mounts, "mounts"),
@@ -204,6 +208,16 @@ function mergeResources(
   if (!parentResources && !childResources) return {} as Record<string, never>;
   // Shallow merge: each field (memory/cpus) is a scalar, child wins.
   return { resources: { ...parentResources, ...childResources } };
+}
+
+function mergeRootfs(
+  parentRootfs: RootfsConfig | undefined,
+  childRootfs: RootfsConfig | undefined,
+): { rootfs: RootfsConfig } | Record<string, never> {
+  if (!parentRootfs && !childRootfs) return {} as Record<string, never>;
+  // Shallow merge: `size` is a scalar and `image` is atomic, so child wins for
+  // whichever keys it actually carries.
+  return { rootfs: { ...parentRootfs, ...childRootfs } };
 }
 
 function mergeStringArrayField<K extends string>(
