@@ -1,5 +1,10 @@
 import { createHttpHooks, VM } from "@earendil-works/gondolin";
 import {
+  ensureImageAssets,
+  parseSizeToMb,
+  type RootfsImageSpec,
+} from "./image.ts";
+import {
   buildVfsMounts,
   buildVfsVolumes,
   type MountSpec,
@@ -34,13 +39,20 @@ export type QemuSpec = {
 
 /**
  * Resolved VM resource sizing. `memory`/`cpus` map verbatim to Gondolin's
- * top-level options; `rootfsSize` maps to `rootfs.size`. An unset field falls
- * back to Gondolin's default.
+ * top-level options. An unset field falls back to Gondolin's default.
  */
 export type ResourcesSpec = {
   memory?: string;
   cpus?: number;
-  rootfsSize?: string;
+};
+
+/**
+ * Resolved root filesystem sizing & source. `size` is QEMU syntax; how it is
+ * applied depends on whether an `image` is built — see {@link runSession}.
+ */
+export type RootfsSpec = {
+  image?: RootfsImageSpec;
+  size?: string;
 };
 
 /** Core's top-level input contract — everything the session needs to run. */
@@ -50,6 +62,7 @@ export type SessionSpec = {
   mounts: MountSpec[];
   volumes?: VolumeSpec[];
   resources?: ResourcesSpec;
+  rootfs?: RootfsSpec;
   env?: Record<string, string>;
   secrets?: Record<string, SecretSpec>;
   qemu?: QemuSpec;
@@ -84,17 +97,35 @@ export async function runSession(
   const mergedEnv = { ...spec.env, ...placeholderSecretsEnv };
   const hasEnv = Object.keys(mergedEnv).length > 0;
 
+  // If `rootfs.image` is given, retrieve custom image from cache or build
+  // fresh if there's a cache miss.
+  const imagePath = spec.rootfs?.image
+    ? await ensureImageAssets({
+        ...spec.rootfs.image,
+        ...(spec.rootfs.size
+          ? { rootfsSizeMb: parseSizeToMb(spec.rootfs.size) }
+          : {}),
+      })
+    : undefined;
+
+  // Size dispatch: for a built image the size is baked in above (no in-guest
+  // resize2fs needed, which minimal images often lack), so only the default
+  // image gets grown at runtime.
+  const growSize =
+    spec.rootfs?.size && !spec.rootfs?.image ? spec.rootfs.size : undefined;
+
+  const sandbox = { ...spec.qemu, ...(imagePath ? { imagePath } : {}) };
+  const hasSandbox = Object.keys(sandbox).length > 0;
+
   console.log("Starting VM…");
   const vm = await VM.create({
     ...networkOptions,
-    ...(spec.resources?.rootfsSize
-      ? { rootfs: { size: spec.resources.rootfsSize } }
-      : {}),
+    ...(growSize ? { rootfs: { size: growSize } } : {}),
     ...(spec.resources?.memory ? { memory: spec.resources.memory } : {}),
     ...(spec.resources?.cpus ? { cpus: spec.resources.cpus } : {}),
     ...(hasEnv ? { env: mergedEnv } : {}),
     ...(hasVfsMounts ? { vfs: { mounts: vfsMounts } } : {}),
-    sandbox: spec.qemu,
+    ...(hasSandbox ? { sandbox } : {}),
     tmpfs: {},
     // ^Disable default tmpfs mounts (/tmp, /var/log, etc.), i.e. don't keep
     // those folders in memory. RAM is more precious than disk space. Besides,

@@ -18,6 +18,9 @@ general, child settings override parent settings, except in the following cases:
 - Env vars, mounts, volumes get merged (shallow merge).
 - Boot commands are concatenated (parent commands run first).
 - Network: Child network mode overrides parent mode; allowed hosts are merged.
+- `rootfs` gets merged field by field, so a child may set `size` without
+  restating `image` (or vice versa). `image` itself is *not* merged field-wise:
+  a child that specifies it replaces the parent's block entirely.
 
 
 ## Config options
@@ -36,7 +39,7 @@ is validated):
     // $PWD lets you mount wherever you launched Tuor from:
     { "hostPath": "$PWD", "guestPath": "/workspace", "mode": "readwrite" }
   ],
-  "resources": { "rootfsSize": "${ROOTFS_SIZE}" },
+  "rootfs": { "size": "${ROOTFS_SIZE}" },
   // Use $$ for a literal dollar sign:
   "env": { "PROMPT": "$$ " }
 }
@@ -109,12 +112,33 @@ that is not set on the host is an error.
   // `qemu.cpu` (the emulated CPU model).
   "resources": {
     "cpus": 4,          // vCPU count (positive integer)
-    "memory": "2G",     // RAM, QEMU syntax (e.g. "512M", "2G")
-    // Minimum virtual disk size (COW overlay, so actual host usage stays
-    // sparse). Note that the virtual disk will be discarded on VM shutdown,
-    // so it is not meant for persisting data across VM boots. (Use mounts &
-    // volumes, instead!)
-    "rootfsSize": "2G"
+    "memory": "2G"      // RAM, QEMU syntax (e.g. "512M", "2G")
+  },
+  "rootfs": {
+    "image": {
+      // Whole OCI image ref (`:tag` or `@sha256:…`). Omit the whole `image`
+      // block to boot Gondolin's default alpine-base image.
+      "ref": "docker.io/library/debian:bookworm-slim",
+      // Optional: container engine used to pull & export the image. Omit to let
+      // Gondolin auto-detect (docker, else podman).
+      "engine": "docker",
+      // Optional (default "if-not-present"): where the image comes from on the
+      // runs that build. "always" to re-pull every time, "never" to use the
+      // engine's local image store only (and fail if the image isn't in it).
+      "pullPolicy": "if-not-present",
+      // Optional (default "if-not-present"): whether to reuse the guest assets
+      // Tuor cached for this `ref`. "always" rebuilds them every run. Note that
+      // `ref`, not the image contents, is the cache identity, so a moving tag
+      // needs *this* set to "always" — `pullPolicy` alone won't refresh
+      // anything, because a cache hit skips the build that would pull.
+      "buildPolicy": "if-not-present"
+    },
+    // Optional: total rootfs size — a positive integer plus a *mandatory*
+    // K/M/G/T suffix. Grow-only (never shrinks).
+    // Note that the virtual disk is discarded on VM shutdown, so it is not
+    // meant for persisting data across VM boots. (Use mounts & volumes,
+    // instead!)
+    "size": "8G"
   },
   // Guest user (numeric uid/gid) the shell runs under and that mounted
   // directories are presented as owned by. `homedir` (optional, default /root)

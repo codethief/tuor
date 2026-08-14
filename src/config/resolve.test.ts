@@ -485,12 +485,11 @@ describe("createSessionSpecFromConfig", () => {
 
     test("passes the resources config through verbatim", () => {
       const spec = resolve({
-        resources: { memory: "2G", cpus: 4, rootfsSize: "8G" },
+        resources: { memory: "2G", cpus: 4 },
       });
       expect(spec.resources).toEqual({
         memory: "2G",
         cpus: 4,
-        rootfsSize: "8G",
       });
     });
 
@@ -502,6 +501,64 @@ describe("createSessionSpecFromConfig", () => {
     test("treats an empty resources config as unset", () => {
       const spec = resolve({ resources: {} });
       expect(spec.resources).toBeUndefined();
+    });
+  });
+
+  describe("rootfs resolution", () => {
+    test("omits rootfs when nothing is configured", () => {
+      const spec = resolve({});
+      expect(spec.rootfs).toBeUndefined();
+    });
+
+    test("passes the image and size through", () => {
+      const spec = resolve({
+        rootfs: {
+          image: {
+            ref: "docker.io/library/debian:bookworm-slim",
+            pullPolicy: "if-not-present",
+            buildPolicy: "if-not-present",
+          },
+          size: "8G",
+        },
+      });
+      expect(spec.rootfs).toEqual({
+        image: {
+          ref: "docker.io/library/debian:bookworm-slim",
+          pullPolicy: "if-not-present",
+          buildPolicy: "if-not-present",
+        },
+        size: "8G",
+      });
+    });
+
+    test("preserves explicit policies and engine", () => {
+      const spec = resolve({
+        rootfs: {
+          image: {
+            ref: "alpine:3.23",
+            engine: "podman",
+            pullPolicy: "always",
+            buildPolicy: "always",
+          },
+        },
+      });
+      expect(spec.rootfs?.image).toEqual({
+        ref: "alpine:3.23",
+        engine: "podman",
+        pullPolicy: "always",
+        buildPolicy: "always",
+      });
+    });
+
+    /** `size` stays a string here — core decides bake-vs-grow. */
+    test("passes a bare size through without inventing an image", () => {
+      const spec = resolve({ rootfs: { size: "512M" } });
+      expect(spec.rootfs).toEqual({ size: "512M" });
+    });
+
+    test("treats an empty rootfs config as unset", () => {
+      const spec = resolve({ rootfs: {} });
+      expect(spec.rootfs).toBeUndefined();
     });
   });
 });
