@@ -384,9 +384,15 @@ describe("parseConfig", () => {
       expect(config.resources).toEqual({ cpus: 8 });
     });
 
-    test("accepts memory without a unit suffix", () => {
-      const config = parseConfig({ resources: { memory: "1024" } });
-      expect(config.resources).toEqual({ memory: "1024" });
+    test.each([
+      "512M",
+      "2g",
+      "1T",
+      "1048576K",
+    ])("accepts memory: %s", (memory) => {
+      expect(parseConfig({ resources: { memory } }).resources).toEqual({
+        memory,
+      });
     });
 
     test("omits resources when not specified", () => {
@@ -491,6 +497,10 @@ describe("parseConfig", () => {
     ["resources unknown field", { resources: { foo: "bar" } }],
     ["resources malformed memory", { resources: { memory: "2GB" } }],
     ["resources empty memory", { resources: { memory: "" } }],
+    [
+      "resources memory without a unit suffix",
+      { resources: { memory: "1024" } },
+    ],
     ["resources non-integer cpus", { resources: { cpus: 1.5 } }],
     ["resources zero cpus", { resources: { cpus: 0 } }],
     ["resources non-number cpus", { resources: { cpus: "4" } }],

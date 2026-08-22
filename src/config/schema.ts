@@ -309,11 +309,11 @@ const types = scope({
   ResourcesConfig: {
     "+": "reject",
     /**
-     * VM RAM in QEMU syntax: a positive integer with an optional K/M/G/T
-     * suffix, e.g. "512M", "2G". Maps to Gondolin's `memory` top-level option.
-     * Gondolin default: "1G".
+     * VM RAM in QEMU-compatible syntax: a positive integer with a *mandatory*
+     * K/M/G/T suffix, e.g. "512M", "2G". Maps to Gondolin's `memory` top-level
+     * option. Gondolin default: "1G".
      */
-    "memory?": type("string > 0").matching(/^\d+[KMGT]?$/i),
+    "memory?": type("string > 0").matching(SIZE_FORMAT),
     /**
      * VM vCPU count (positive integer). Maps to Gondolin's `cpus` top-level
      * option. Gondolin default: 2. Note that this config option is distinct

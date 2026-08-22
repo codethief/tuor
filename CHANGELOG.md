@@ -2,9 +2,11 @@
 
 ## Breaking changes
 - Config: Replaced `resources.rootfsSize` with a new `rootfs.size` setting (see
-  below) and added stricter validation. The old field accepted any non-empty
-  string; the new one enforces a QEMU-compatible size syntax (a positive integer
-  with a *mandatory* K/M/G/T suffix).
+  below) and added stricter up-front validation. The old field (theoretically)
+  accepted any non-empty string; the new one enforces a QEMU-compatible size
+  syntax – a positive integer with a *mandatory* K/M/G/T suffix.
+- Config: `resources.memory` now requires a mandatory unit suffix (K/M/G/T), for
+  consistency with `rootfs.size` (see above).
 
 
 ## Features
