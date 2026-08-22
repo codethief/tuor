@@ -1,5 +1,10 @@
 # Unreleased
 
+## Features
+- Config: `config.json` files are now parsed as
+  [JSONC](https://en.wikipedia.org/wiki/JSON#JSONC), i.e. allow `// line` and
+  `/* block */` comments as well as trailing commas.
+
 
 # 0.5.1 (2026-08-03)
 

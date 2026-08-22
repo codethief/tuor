@@ -3,6 +3,12 @@ Tuor can be configured by placing an appropriate `config.json` either in
 `~/.config/tuor` or in a `.tuor` directory in the current working directory or
 any of its parents.
 
+Config files are read as [JSONC](https://en.wikipedia.org/wiki/JSON#JSONC) (=
+regular JSON + `// line` and `/* block */` comments + trailing commas), using
+the [same parser](https://github.com/microsoft/node-jsonc-parser) (by Microsoft)
+that VSCode uses, too. An informal specification (not by Microsoft) can be found
+at https://jsonc.org/.
+
 
 ## Config inheritance
 Configs in child directories inherit from configs in parent directories (and so
@@ -24,7 +30,7 @@ Any string value in the config (but not keys) may reference host environment
 variables, resolved on the host right after the config is loaded (and before it
 is validated):
 
-```javascript
+```jsonc
 {
   "mounts": [
     // $PWD lets you mount wherever you launched Tuor from:
@@ -42,7 +48,7 @@ that is not set on the host is an error.
 
 
 ## Example `config.json`
-```javascript
+```jsonc
 {
   "network": {
     // "open" for unrestricted access, "restricted" for allowlist

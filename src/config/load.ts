@@ -5,6 +5,7 @@ import type { SessionSpec } from "../core/session.ts";
 import { applyConfigDefaults, type DefaultedConfig } from "./defaults.ts";
 import { interpolateVars } from "./interpolate-vars.ts";
 import { findAllConfigDirs, mergeConfigs } from "./merge.ts";
+import { parseJsonc } from "./parse-jsonc.ts";
 import { createSessionSpecFromConfig } from "./resolve.ts";
 import { parseConfig } from "./schema.ts";
 
@@ -42,15 +43,18 @@ export function loadEffectiveConfig(): LoadedEffectiveConfig {
   // Interpolate $VAR / ${VAR} against the host env per layer (before parsing,
   // so interpolated values are still schema-validated and every string value
   // is covered).
-  const layers = configDirs.map((dir) => ({
-    config: parseConfig(
-      interpolateVars(
-        JSON.parse(readFileSync(join(dir, "config.json"), "utf-8")),
-        process.env,
+  const layers = configDirs.map((dir) => {
+    const path = join(dir, "config.json");
+    return {
+      config: parseConfig(
+        interpolateVars(
+          parseJsonc(readFileSync(path, "utf-8"), path),
+          process.env,
+        ),
       ),
-    ),
-    configDir: dir,
-  }));
+      configDir: dir,
+    };
+  });
   const merged = mergeConfigs(layers);
   const closestConfigDir = configDirs[configDirs.length - 1]!;
 
