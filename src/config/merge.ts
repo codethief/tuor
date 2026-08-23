@@ -245,6 +245,30 @@ function preResolvePaths(layer: ConfigLayer): TuorConfig {
     ...(typeof config.workdir === "object"
       ? { workdir: preResolveMountPaths(config.workdir, configDir) }
       : {}),
+    ...(config.rootfs
+      ? { rootfs: preResolveRootfsPaths(config.rootfs, configDir) }
+      : {}),
+  };
+}
+
+/**
+ * Resolve a build-variant image's `containerfile`/`context` against the layer
+ * that declared them. Both are plain host paths — no tilde expansion, matching
+ * `host:` ignoreFileRefs.
+ */
+function preResolveRootfsPaths(
+  rootfs: RootfsConfig,
+  configDir: string,
+): RootfsConfig {
+  const { image } = rootfs;
+  if (!image || !("containerfile" in image)) return rootfs;
+  return {
+    ...rootfs,
+    image: {
+      ...image,
+      containerfile: resolve(configDir, image.containerfile),
+      context: resolve(configDir, image.context),
+    },
   };
 }
 
