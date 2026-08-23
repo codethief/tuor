@@ -3,7 +3,7 @@ import { type ConfigLayer, findAllConfigDirs, mergeConfigs } from "./merge.ts";
 import {
   type MountConfig,
   parseConfig,
-  type RootfsImageConfig,
+  type RootfsImagePullConfig,
   type TuorConfig,
 } from "./schema.ts";
 
@@ -30,10 +30,10 @@ function mount(
   return { mode: "readonly", ...overrides };
 }
 
-/** Rootfs image with its required policy defaults. */
+/** Pull-variant rootfs image with its required policy defaults. */
 function withPolicyDefaults(
-  overrides: Partial<RootfsImageConfig> & { ref: string },
-): RootfsImageConfig {
+  overrides: Partial<RootfsImagePullConfig> & { ref: string },
+): RootfsImagePullConfig {
   return {
     pullPolicy: "if-not-present",
     buildPolicy: "if-not-present",
@@ -538,6 +538,72 @@ describe("mergeConfigs", () => {
       expect(result.rootfs?.image).toEqual(
         withPolicyDefaults({ ref: "alpine:3.23" }),
       );
+    });
+
+    test("resolves containerfile and context against the declaring layer", () => {
+      const result = mergeConfigs([
+        layer("/a/.tuor", {
+          rootfs: {
+            image: {
+              ref: "my-devbox",
+              containerfile: "./docker/Containerfile",
+              context: "..",
+              buildPolicy: "always",
+            },
+          },
+        }),
+      ]);
+      expect(result.rootfs?.image).toEqual({
+        ref: "my-devbox",
+        containerfile: "/a/.tuor/docker/Containerfile",
+        context: "/a",
+        buildPolicy: "always",
+      });
+    });
+
+    test("leaves absolute containerfile and context paths alone", () => {
+      const result = mergeConfigs([
+        layer("/a/.tuor", {
+          rootfs: {
+            image: {
+              ref: "my-devbox",
+              containerfile: "/elsewhere/Containerfile",
+              context: "/elsewhere",
+              buildPolicy: "always",
+            },
+          },
+        }),
+      ]);
+      expect(result.rootfs?.image).toMatchObject({
+        containerfile: "/elsewhere/Containerfile",
+        context: "/elsewhere",
+      });
+    });
+
+    /**
+     * Each layer's paths are resolved before the merge, so a child that replaces
+     * `image` still gets paths relative to *its own* config dir.
+     */
+    test("resolves a child's paths against the child's config dir", () => {
+      const result = mergeConfigs([
+        layer("/a/.tuor", {
+          rootfs: { image: withPolicyDefaults({ ref: "debian:trixie" }) },
+        }),
+        layer("/a/b/.tuor", {
+          rootfs: {
+            image: {
+              ref: "my-devbox",
+              containerfile: "./Containerfile",
+              context: ".",
+              buildPolicy: "if-not-present",
+            },
+          },
+        }),
+      ]);
+      expect(result.rootfs?.image).toMatchObject({
+        containerfile: "/a/b/.tuor/Containerfile",
+        context: "/a/b/.tuor",
+      });
     });
 
     /**
