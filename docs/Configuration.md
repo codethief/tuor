@@ -10,22 +10,56 @@ that VSCode uses, too. An informal specification (not by Microsoft) can be found
 at https://jsonc.org/.
 
 
-## Config inheritance
-Configs in child directories inherit from configs in parent directories (and so
-on), which in turn inherit from the global `~/.config/tuor/config.json`. In
-general, child settings override parent settings, except in the following cases:
-
-- Env vars, mounts, volumes get merged (shallow merge).
-- Boot commands are concatenated (parent commands run first).
-- Network: Child network mode overrides parent mode; allowed hosts are merged.
-- `rootfs` gets merged field by field, so a child may set `size` without
-  restating `image` (or vice versa). `image` itself is *not* merged field-wise:
-  a child that specifies it replaces the parent's block entirely.
-
-
 ## Config options
 A detailed documentation of all config options is still work in progress. In the
 meantime, please refer to [`/src/config/schema.ts`](../src/config/schema.ts).
+
+
+## Config inheritance & merging
+Configs in child directories inherit from configs in parent directories (and so
+on), which in turn inherit from the global `~/.config/tuor/config.json`. The
+individual config files don't need to provide all settings that are required by
+the schema (see above); only the end result after merging them gets validated.
+
+Relative host path references in a given config file (e.g. `workdir: "../foo"`)
+are always evaluated relative to *that* config file's location, before it
+potentially gets merged with other configs.
+
+
+**How inheritance works:** In general, top-level settings in the child config
+override top-level settings in the parent config. However, in some cases
+settings are deep-merged and the config inheritance algorithm descends down the
+config schema tree, or values are concatenated with the parent config (e.g. in
+case of lists), as indicated below:
+
+```jsonc
+{
+  "bootCommands": [],  // concatenate with parent list (parent commands run first)
+  "env": {},  // concatenate/shallow-merge with parent dictionary
+  "guestUser?": {},  // override parent
+  "mounts": [],  // concatenate with parent list
+  "network": {
+    "mode": "",  // override parent
+    "allowedHosts": [],  // concatenate with parent list
+    "allowedInternalHosts": [], // concatenate with parent list
+  },
+  "qemu": {
+    "accel": "",  // override parent
+    "cpu": "",  // override parent
+    "machineType": "",  // override parent
+  },  // ?
+  "resources": {
+    "cpus": "",  // override parent
+    "memory": "",  // override parent
+  },  // ?
+  "rootfs": {
+    "image": {},  // override parent
+    "size": "",  // override parent
+  },
+  "volumes": [],  // concatenate with parent list
+  "workdir": {} /* or string value */,  // override parent
+}
+```
 
 
 ## Variables
