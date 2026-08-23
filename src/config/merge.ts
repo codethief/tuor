@@ -86,7 +86,12 @@ export function mergeConfigs(layers: ConfigLayer[]): TuorConfig {
 
 // --- Internals ---
 
-/** Merge two configs where `child` overrides `parent`. */
+/**
+ * Merge two configs where `child` overrides `parent`.
+ *
+ * The behavior here should be kept in sync with the documentation in
+ * /docs/Configuration.md .
+ */
 function mergeTwoConfigs(parent: TuorConfig, child: TuorConfig): TuorConfig {
   return {
     // Scalars: child wins, falling back to parent when the child omits the
