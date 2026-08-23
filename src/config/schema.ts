@@ -363,6 +363,15 @@ const types = scope({
    * An optional OCI image to build the guest rootfs from. Essentially a config
    * setting for https://earendil-works.github.io/gondolin/custom-images/ .
    *
+   * Two ways to name the image, distinguished by whether `containerfile` is
+   * present:
+   * - {@link RootfsImagePullConfig} — the image already exists (in a registry
+   *   or the engine's local store) and is pulled.
+   * - {@link RootfsImageBuildConfig} — the image is built from a Containerfile
+   *   on the host first, then used exactly like a pulled one.
+   *
+   * Either way, `ref` names the image and doubles as its cache identity.
+   *
    * Note that the choice of image doesn't affect the guest kernel which is
    * always taken from Alpine.
    *
@@ -378,10 +387,14 @@ const types = scope({
    * - `lz4`
    * - `mke2fs` or `mkfs.ext4`
    * - `debugfs`
+   * - Docker or Podman
    *
    * On Debian/Ubuntu: `apt install cpio lz4 e2fsprogs`.
    */
-  RootfsImageConfig: {
+  RootfsImageConfig: "RootfsImagePullConfig | RootfsImageBuildConfig",
+
+  /** Use an OCI image that already exists, pulling it when necessary. */
+  RootfsImagePullConfig: {
     "+": "reject",
     /**
      * The OCI image to be used for the rootfs. The architecture is always the
@@ -424,6 +437,59 @@ const types = scope({
      */
     pullPolicy: "'always' | 'if-not-present' | 'never' = 'if-not-present'",
   },
+
+  /**
+   * Build the OCI image from a Containerfile on the host, then use it as the
+   * rootfs source. Gondolin itself has no Containerfile support (it only pulls,
+   * creates and exports existing images), so Tuor runs `<engine> build` and
+   * hands Gondolin the resulting local image.
+   *
+   * IMPORTANT: `ref` alone is the cache identity — the Containerfile and the
+   * context are *not* hashed. Editing them without bumping `ref` will keep
+   * booting the previously built rootfs. To work around this, use `buildPolicy:
+   * "always"` while iterating on a Containerfile, or a fresh `ref` (a UUID
+   * works well) per revision.
+   */
+  RootfsImageBuildConfig: {
+    "+": "reject",
+    /**
+     * Name to tag the built image with, and the identity Tuor caches it under
+     * (see the note above). Passed verbatim to `<engine> build -t`.
+     *
+     * Format: `[repo/]name[:tag]`, lowercase.
+     */
+    ref: type("string > 0").matching(
+      /^[a-z0-9][a-z0-9._/-]*(:[A-Za-z0-9_][A-Za-z0-9._-]*)?$/,
+    ),
+    /**
+     * Path to the Containerfile/Dockerfile, absolute or relative to the
+     * directory containing the config file. Passed to `<engine> build -f`.
+     */
+    containerfile: "string > 0",
+    /**
+     * Build context directory, absolute or relative to the directory containing
+     * the config file.
+     */
+    context: "string > 0",
+    /**
+     * Container engine used to build the image. Omit to let Tuor auto-detect
+     * (docker, else podman).
+     */
+    "engine?": "'docker' | 'podman'",
+    /**
+     * Whether to reuse a cached VM image build vs. whether to re-run `<engine>
+     * build`. Allowed values:
+     *
+     * - always: build on every run, and rebuild the VM image from the result.
+     *   The engine's own layer cache still applies, so an unchanged
+     *   Containerfile rebuilds quickly.
+     * - if-not-present: skip the build if Tuor already has cached the VM image
+     *   for `ref`. Fastest, but with the caveat that changes in the
+     *   Containerfile or build context won't trigger a rebuild (since the `ref`
+     *   is the same).
+     */
+    buildPolicy: "'always' | 'if-not-present'",
+  },
 }).export();
 
 export type GuestUserConfig = typeof types.GuestUserConfig.infer;
@@ -435,6 +501,8 @@ export type QemuConfig = typeof types.QemuConfig.infer;
 export type ResourcesConfig = typeof types.ResourcesConfig.infer;
 export type RootfsConfig = typeof types.RootfsConfig.infer;
 export type RootfsImageConfig = typeof types.RootfsImageConfig.infer;
+export type RootfsImagePullConfig = typeof types.RootfsImagePullConfig.infer;
+export type RootfsImageBuildConfig = typeof types.RootfsImageBuildConfig.infer;
 export type NetworkConfig = typeof types.NetworkConfig.infer;
 export type EnvFromHost = typeof types.EnvFromHost.infer;
 export type EnvSecret = typeof types.EnvSecret.infer;

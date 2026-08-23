@@ -118,7 +118,7 @@ export function createSessionSpecFromConfig(
 
   const qemu = resolveQemu(config.qemu);
   const resources = resolveResources(config.resources);
-  const rootfs = resolveRootfs(config.rootfs);
+  const rootfs = resolveRootfs(config.rootfs, deps.mountValidation);
 
   return {
     workdir: guestWorkdir,
@@ -285,9 +285,39 @@ function resolveResources(
  */
 function resolveRootfs(
   rootfs: DefaultedConfig["rootfs"],
+  deps: MountValidationDeps,
 ): RootfsSpec | undefined {
   if (!rootfs || Object.keys(rootfs).length === 0) return undefined;
+  if (rootfs.image && "containerfile" in rootfs.image) {
+    validateImageBuildPaths(rootfs.image, deps);
+  }
   return { ...rootfs };
+}
+
+/**
+ * Check the Containerfile and build context up front. Both paths were already
+ * made absolute in `preResolvePaths`, and without this a typo would only
+ * surface much later as a raw `<engine> build` error — after the host-tool
+ * preflight and possibly a sandbox-helper download.
+ */
+function validateImageBuildPaths(
+  image: { containerfile: string; context: string },
+  deps: MountValidationDeps,
+): void {
+  if (!deps.pathExists(image.containerfile)) {
+    throw new Error(
+      `rootfs.image.containerfile does not exist: ${image.containerfile}`,
+    );
+  }
+  if (!deps.pathExists(image.context)) {
+    throw new Error(`rootfs.image.context does not exist: ${image.context}`);
+  }
+  if (!deps.isDirectory(image.context)) {
+    throw new Error(
+      `rootfs.image.context is not a directory: ${image.context}. ` +
+        "It is the root of the build context handed to the container engine.",
+    );
+  }
 }
 
 function resolveVolumeConfig(

@@ -17,7 +17,8 @@
   feature](https://earendil-works.github.io/gondolin/custom-images/) that allows
   configuring a custom OCI container image to be used for the VM's rootfs
   instead of Gondolin's default `alpine-base` image. (The kernel is still taken
-  from Alpine, though.))
+  from Alpine, though.) The OCI image can either be an existing one or it can be
+  built from a Dockerfile/Containerfile.
 - Config: The new `rootfs.size` setting can be used both with the default VM
   rootfs (same behavior as the old `resources.rootfsSize`), in which case it
   grows the file system after boot (using `resize2fs`), or with a custom image

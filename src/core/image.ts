@@ -27,24 +27,59 @@ export type RootfsBuildPolicy = "always" | "if-not-present";
 export type ContainerEngine = "docker" | "podman";
 
 /**
- * Core's input contract for a custom guest rootfs: the OCI image to build from
- * plus the knobs that affect the built assets.
- *
- * The two policies are independent axes: `pullPolicy` says where the OCI image
- * comes from, `buildPolicy` whether the guest assets are rebuilt from it. Since
- * a reused asset needs no image at all, `pullPolicy` only matters on the runs
- * that actually build.
+ * Reference to an existing OCI image {@link buildAndStore} that we can hand to
+ * Gondolin, plus how exactly Gondolin should obtain it. Covers only the
+ * *image*; whether guest assets get rebuilt from it is `buildPolicy`, a
+ * separate axis.
  */
-export type RootfsImageSpec = {
+type OciImageSource = {
   /** OCI image ref: `repo/name[:tag]` or `repo/name@sha256:…`. */
   ref: string;
   pullPolicy: RootfsPullPolicy;
-  buildPolicy: RootfsBuildPolicy;
   /** Omitted → Gondolin auto-detects (docker, else podman). */
   engine?: ContainerEngine;
+};
+
+/** Use an OCI image that already exists, pulling it when necessary. */
+export type RootfsImagePullSource = OciImageSource & {
+  buildPolicy: RootfsBuildPolicy;
+};
+
+/**
+ * Build the OCI image from a Containerfile first, then use it like a pulled
+ * one. Gondolin only pulls/creates/exports existing images, so the
+ * `<engine> build` step is ours.
+ */
+export type RootfsImageBuildSource = {
+  /** Tag to build into; also the cache identity (contents are *not* hashed). */
+  ref: string;
+  /** Absolute path to the Containerfile/Dockerfile. */
+  containerfile: string;
+  /** Absolute path to the build context directory. */
+  context: string;
+  buildPolicy: RootfsBuildPolicy;
+  /** Omitted → auto-detected (docker, else podman). */
+  engine?: ContainerEngine;
+};
+
+/**
+ * Core's input contract for a custom guest rootfs: where the OCI image comes
+ * from plus the knobs that affect the built assets.
+ */
+export type RootfsImageSpec = (
+  | RootfsImagePullSource
+  | RootfsImageBuildSource
+) & {
   /** Total rootfs size baked into the built image (see `parseSizeToMb`). */
   rootfsSizeMb?: number;
 };
+
+/** Narrow a spec to the Containerfile variant. Both variants carry a `ref`. */
+function isBuildSpec(
+  spec: RootfsImageSpec,
+): spec is RootfsImageBuildSource & { rootfsSizeMb?: number } {
+  return "containerfile" in spec;
+}
 
 /**
  * Injectable seams for {@link ensureImageAssets}: the Gondolin entry points it
@@ -54,6 +89,10 @@ export type RootfsImageSpec = {
 export type ImageDeps = {
   /** Whether `command` is on PATH. */
   hasCommand: (command: string) => boolean;
+  /** Run `<engine> build …`, streaming its output to the user's terminal. */
+  runEngineBuild: (engine: ContainerEngine, args: string[]) => void;
+  /** Whether `<engine>`'s local store already holds an image tagged `ref`. */
+  hasLocalImage: (engine: ContainerEngine, ref: string) => boolean;
   listImageRefs: () => LocalImageRef[];
   resolveImageSelector: (
     selector: string,
@@ -91,8 +130,11 @@ export type ImageDeps = {
  *
  * Building is slow (image pull + mke2fs), so it happens at most once per cache
  * identity — unless `buildPolicy` is "always", which rebuilds every run.
- * `pullPolicy` governs the separate question of where the OCI image comes
- * from, and so only matters on the runs that do build.
+ * `pullPolicy` (pull variant) governs the separate question of where the OCI
+ * image comes from, and so only matters on the runs that do build.
+ *
+ * For a Containerfile spec the OCI image itself doesn't exist yet, so an
+ * `<engine> build` runs first; see {@link ensureOciImage}.
  */
 export async function ensureImageAssets(
   spec: RootfsImageSpec,
@@ -115,7 +157,8 @@ export async function ensureImageAssets(
       const now = resolveCached(tuorRef, arch, deps);
       if (now) return now;
     }
-    return await buildAndStore(spec, arch, tuorRef, deps);
+    const source = isBuildSpec(spec) ? ensureOciImage(spec, arch, deps) : spec;
+    return await buildAndStore(source, spec.rootfsSizeMb, arch, tuorRef, deps);
   });
 }
 
@@ -231,8 +274,9 @@ export function _hasCachedAssets(
  * exit code that names nothing, and the container-engine check only runs after
  * sandbox helper binaries have been downloaded.
  *
- * We deliberately do not pick an engine — that stays Gondolin's job. We just
- * assert that *some* engine exists.
+ * This only asserts that a usable engine exists; picking one is Gondolin's job
+ * for the pull variant, and {@link _detectEngine}'s for the Containerfile
+ * variant (which needs a concrete engine of its own to build with).
  */
 export function _preflightBuildTools(
   engine: ContainerEngine | undefined,
@@ -287,8 +331,90 @@ function resolveCached(
   return deps.resolveImageSelector(tuorRef, arch).assetDir;
 }
 
+/**
+ * Make sure the OCI image named by `spec.ref` exists in the engine's local
+ * store, building it from the Containerfile when it doesn't, and describe it
+ * the way {@link buildAndStore} wants.
+ *
+ * The result is always `pullPolicy: "never"`: the image is local-only and
+ * Gondolin should not pull.
+ */
+function ensureOciImage(
+  spec: RootfsImageBuildSource,
+  arch: Architecture,
+  deps: ImageDeps,
+): OciImageSource {
+  // Unlike the pull variant we resolve the engine ourselves and pass it on, so
+  // that the build below and Gondolin's later export can't pick different ones.
+  const engine = spec.engine ?? _detectEngine(deps.hasCommand);
+
+  // "always" rebuilds unconditionally; the engine's layer cache keeps that cheap
+  // when nothing changed. Otherwise an image already tagged `ref` is good enough
+  // — it may well have been built by hand.
+  const skipBuild =
+    spec.buildPolicy === "if-not-present" &&
+    deps.hasLocalImage(engine, spec.ref);
+
+  if (skipBuild) {
+    deps.log(`Using existing ${engine} image ${spec.ref}.`);
+  } else {
+    deps.log(`Building ${spec.ref} from ${spec.containerfile} with ${engine}…`);
+    deps.runEngineBuild(
+      engine,
+      _engineBuildArgs({
+        ref: spec.ref,
+        containerfile: spec.containerfile,
+        context: spec.context,
+        platform: _ociPlatform(arch),
+      }),
+    );
+  }
+
+  return { ref: spec.ref, pullPolicy: "never", engine };
+}
+
+/**
+ * Pick a container engine the way Gondolin's own `detectOciRuntime` does.
+ * Callers are expected to have run {@link _preflightBuildTools} first, which is
+ * where the "no engine at all" case gets its actionable error message.
+ */
+export function _detectEngine(
+  hasCommand: (command: string) => boolean,
+): ContainerEngine {
+  return hasCommand("docker") ? "docker" : "podman";
+}
+
+/** The OCI platform Gondolin will export for — mirrors its `getOciPlatform`. */
+export function _ociPlatform(arch: Architecture): string {
+  return arch === "x86_64" ? "linux/amd64" : "linux/arm64";
+}
+
+/**
+ * Argument vector for `<engine> build`. `--platform` is pinned to the arch
+ * Gondolin exports for; it is the host's, so this is normally a no-op — but it
+ * keeps a multi-arch base image from silently yielding an unbootable rootfs.
+ */
+export function _engineBuildArgs(args: {
+  ref: string;
+  containerfile: string;
+  context: string;
+  platform: string;
+}): string[] {
+  return [
+    "build",
+    "--platform",
+    args.platform,
+    "-t",
+    args.ref,
+    "-f",
+    args.containerfile,
+    args.context,
+  ];
+}
+
 async function buildAndStore(
-  spec: RootfsImageSpec,
+  source: OciImageSource,
+  rootfsSizeMb: number | undefined,
   arch: Architecture,
   tuorRef: string,
   deps: ImageDeps,
@@ -298,16 +424,16 @@ async function buildAndStore(
     ...defaults,
     arch,
     oci: {
-      image: spec.ref,
-      pullPolicy: spec.pullPolicy,
-      // Only forwarded when the user asked for a specific engine; otherwise
-      // Gondolin auto-detects.
-      ...(spec.engine ? { runtime: spec.engine } : {}),
+      image: source.ref,
+      pullPolicy: source.pullPolicy,
+      // Only forwarded when we know which engine to use; otherwise Gondolin
+      // auto-detects.
+      ...(source.engine ? { runtime: source.engine } : {}),
     },
     // Merge rather than replace, so Gondolin's default volume label survives.
     // A baked size needs no in-guest resize2fs at boot.
-    ...(spec.rootfsSizeMb
-      ? { rootfs: { ...defaults.rootfs, sizeMb: spec.rootfsSizeMb } }
+    ...(rootfsSizeMb
+      ? { rootfs: { ...defaults.rootfs, sizeMb: rootfsSizeMb } }
       : {}),
   };
 
@@ -316,7 +442,7 @@ async function buildAndStore(
   const outputDir = mkdtempSync(join(tmpdir(), "tuor-build-"));
   try {
     deps.log(
-      `Building custom rootfs from ${spec.ref} (this can take a while)…`,
+      `Building custom rootfs from ${source.ref} (this can take a while)…`,
     );
     await deps.buildAssets(buildConfig, { outputDir });
 
@@ -407,6 +533,25 @@ function hasCommandOnPath(command: string): boolean {
 }
 
 /**
+ * `stdio: "inherit"` on purpose: a cold `docker build` can run for minutes, and
+ * its progress output is the only sign that anything is happening. A failure
+ * surfaces as execFileSync's throw, with the engine's own diagnostics already on
+ * the user's terminal.
+ */
+function runEngineBuildOnHost(engine: ContainerEngine, args: string[]): void {
+  execFileSync(engine, args, { stdio: "inherit" });
+}
+
+function hasLocalImageInStore(engine: ContainerEngine, ref: string): boolean {
+  try {
+    execFileSync(engine, ["image", "inspect", ref], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Read the *installed* Gondolin's version at runtime (not the one Tuor was built
  * against), since Tuor depends on a version range.
  */
@@ -424,6 +569,8 @@ function readGondolinVersion(): string {
 
 const defaultImageDeps: ImageDeps = {
   hasCommand: hasCommandOnPath,
+  runEngineBuild: runEngineBuildOnHost,
+  hasLocalImage: hasLocalImageInStore,
   listImageRefs,
   resolveImageSelector,
   importImageFromDirectory,

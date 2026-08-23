@@ -8,22 +8,43 @@ import type {
 } from "@earendil-works/gondolin";
 import { getDefaultBuildConfig } from "@earendil-works/gondolin";
 import { describe, expect, test, vi } from "vitest";
+import type { ContainerEngine } from "./image.ts";
 import {
+  _detectEngine,
+  _engineBuildArgs,
   _hasCachedAssets,
   _hostArch,
   _lockPath,
+  _ociPlatform,
   _preflightBuildTools,
   _tuorImageRef,
   ensureImageAssets,
   type ImageDeps,
   parseSizeToMb,
+  type RootfsImageBuildSource,
+  type RootfsImagePullSource,
   type RootfsImageSpec,
 } from "./image.ts";
 
-function spec(overrides: Partial<RootfsImageSpec> = {}): RootfsImageSpec {
+type PullSpec = RootfsImagePullSource & { rootfsSizeMb?: number };
+type BuildSpec = RootfsImageBuildSource & { rootfsSizeMb?: number };
+
+/** A pull-variant spec: the OCI image already exists somewhere. */
+function spec(overrides: Partial<PullSpec> = {}): PullSpec {
   return {
     ref: "docker.io/library/debian:bookworm-slim",
     pullPolicy: "if-not-present",
+    buildPolicy: "if-not-present",
+    ...overrides,
+  };
+}
+
+/** A build-variant spec: the OCI image is produced from a Containerfile. */
+function buildSpec(overrides: Partial<BuildSpec> = {}): BuildSpec {
+  return {
+    ref: "my-devbox",
+    containerfile: "/proj/Containerfile",
+    context: "/proj",
     buildPolicy: "if-not-present",
     ...overrides,
   };
@@ -155,6 +176,31 @@ describe("_tuorImageRef", () => {
       ),
     );
   });
+
+  /** Same for the build variant — and the Containerfile is not hashed either. */
+  test("keys a build spec on its ref alone", () => {
+    expect(
+      _tuorImageRef(
+        buildSpec({
+          buildPolicy: "always",
+          containerfile: "/elsewhere/Containerfile",
+          context: "/elsewhere",
+        }),
+        "x86_64",
+        "0.12.0",
+      ),
+    ).toBe(_tuorImageRef(buildSpec(), "x86_64", "0.12.0"));
+  });
+
+  /**
+   * `docker build -t foo` and `docker pull foo` name the same image, so the two
+   * variants sharing a cache entry for the same ref is correct, not a clash.
+   */
+  test("keys both variants alike, so the same ref shares one entry", () => {
+    expect(_tuorImageRef(buildSpec({ ref: "x" }), "x86_64", "0.12.0")).toBe(
+      _tuorImageRef(spec({ ref: "x" }), "x86_64", "0.12.0"),
+    );
+  });
 });
 
 describe("_hasCachedAssets", () => {
@@ -177,6 +223,47 @@ describe("_hasCachedAssets", () => {
   test("ignores refs belonging to other images", () => {
     const refs = [ref("tuor/other:latest", { x86_64: "build-1" })];
     expect(_hasCachedAssets(TUOR_REF, "x86_64", refs)).toBe(false);
+  });
+});
+
+describe("_detectEngine", () => {
+  test("prefers docker when both are installed", () => {
+    expect(_detectEngine(probe(["docker", "podman"]))).toBe("docker");
+  });
+
+  test("falls back to podman when docker is absent", () => {
+    expect(_detectEngine(probe(["podman"]))).toBe("podman");
+  });
+});
+
+describe("_ociPlatform", () => {
+  test.each([
+    ["x86_64", "linux/amd64"],
+    ["aarch64", "linux/arm64"],
+  ] as const)("maps %s to %s", (arch, expected) => {
+    expect(_ociPlatform(arch)).toBe(expected);
+  });
+});
+
+describe("_engineBuildArgs", () => {
+  test("passes the tag, Containerfile and context, with the context last", () => {
+    expect(
+      _engineBuildArgs({
+        ref: "my-devbox",
+        containerfile: "/proj/Containerfile",
+        context: "/proj",
+        platform: "linux/amd64",
+      }),
+    ).toEqual([
+      "build",
+      "--platform",
+      "linux/amd64",
+      "-t",
+      "my-devbox",
+      "-f",
+      "/proj/Containerfile",
+      "/proj",
+    ]);
   });
 });
 
@@ -270,6 +357,7 @@ type ImageCalls = {
     buildId: string;
     arch: Architecture;
   }>;
+  engineBuilds: Array<{ engine: ContainerEngine; args: string[] }>;
   logs: string[];
 };
 
@@ -281,6 +369,10 @@ type HarnessOptions = {
   gondolinVersion?: string;
   /** Runs inside the fake `buildAssets` — throw here to model a failed build. */
   onBuild?: (options: BuildOptions) => void;
+  /** Image tags the container engine's local store already holds. */
+  localImages?: string[];
+  /** Runs inside the fake engine build — throw here to model a failed build. */
+  onEngineBuild?: () => void;
 };
 
 /**
@@ -297,6 +389,8 @@ function harness(options: HarnessOptions = {}): {
     arch = "x86_64",
     gondolinVersion = FAKE_GONDOLIN_VERSION,
     onBuild,
+    localImages = [],
+    onEngineBuild,
   } = options;
 
   const calls: ImageCalls = {
@@ -304,11 +398,17 @@ function harness(options: HarnessOptions = {}): {
     buildAssets: [],
     importImageFromDirectory: [],
     setImageRef: [],
+    engineBuilds: [],
     logs: [],
   };
 
   const deps: ImageDeps = {
     hasCommand: probe(installed),
+    runEngineBuild: (engine, args) => {
+      calls.engineBuilds.push({ engine, args });
+      onEngineBuild?.();
+    },
+    hasLocalImage: (_engine, imageRef) => localImages.includes(imageRef),
     listImageRefs: () => refs,
     resolveImageSelector: (selector, selectorArch) => {
       calls.resolveImageSelector.push({ selector, arch: selectorArch });
@@ -560,6 +660,176 @@ describe("ensureImageAssets", () => {
         /Docker or Podman/,
       );
       expect(calls.buildAssets).toHaveLength(0);
+    });
+
+    test("fails before invoking the engine when a tool is missing", async () => {
+      const { deps, calls } = harness({
+        installed: ALL_TOOLS.filter((t) => t !== "cpio"),
+      });
+
+      await expect(ensureImageAssets(buildSpec(), deps)).rejects.toThrow(
+        /cpio/,
+      );
+      expect(calls.engineBuilds).toHaveLength(0);
+      expect(calls.buildAssets).toHaveLength(0);
+    });
+  });
+
+  describe("building from a Containerfile", () => {
+    test("builds the image, then the guest assets from it", async () => {
+      const { deps, calls } = harness();
+
+      await expect(ensureImageAssets(buildSpec(), deps)).resolves.toBe(
+        "/store/built",
+      );
+      expect(calls.engineBuilds).toEqual([
+        {
+          engine: "docker",
+          args: _engineBuildArgs({
+            ref: "my-devbox",
+            containerfile: "/proj/Containerfile",
+            context: "/proj",
+            platform: "linux/amd64",
+          }),
+        },
+      ]);
+      // The freshly built image is local-only, so Gondolin must not go looking
+      // for `my-devbox` in a registry.
+      expect(builtConfig(calls).oci).toEqual({
+        image: "my-devbox",
+        pullPolicy: "never",
+        runtime: "docker",
+      });
+    });
+
+    /**
+     * Unlike the pull variant, the engine is never left for Gondolin to detect:
+     * we build with one and it must export with the same one.
+     */
+    test("forwards the auto-detected engine to Gondolin", async () => {
+      const { deps, calls } = harness({
+        installed: ALL_TOOLS.filter((t) => t !== "docker"),
+      });
+
+      await ensureImageAssets(buildSpec(), deps);
+      expect(calls.engineBuilds[0]!.engine).toBe("podman");
+      expect(builtConfig(calls).oci?.runtime).toBe("podman");
+    });
+
+    test("honors an explicitly configured engine", async () => {
+      const { deps, calls } = harness();
+
+      await ensureImageAssets(buildSpec({ engine: "podman" }), deps);
+      expect(calls.engineBuilds[0]!.engine).toBe("podman");
+      expect(builtConfig(calls).oci?.runtime).toBe("podman");
+    });
+
+    test("builds for the injected architecture", async () => {
+      const { deps, calls } = harness({ arch: "aarch64" });
+
+      await ensureImageAssets(buildSpec(), deps);
+      expect(calls.engineBuilds[0]!.args).toContain("linux/arm64");
+    });
+
+    describe("buildPolicy if-not-present", () => {
+      test("skips both builds when guest assets are cached", async () => {
+        const { deps, calls } = harness({
+          refs: [cachedRef(buildSpec(), "x86_64")],
+        });
+
+        await expect(ensureImageAssets(buildSpec(), deps)).resolves.toBe(
+          "/store/cached",
+        );
+        expect(calls.engineBuilds).toHaveLength(0);
+        expect(calls.buildAssets).toHaveLength(0);
+      });
+
+      /**
+       * Second rung of the ladder: the guest assets are gone but the OCI image
+       * is still there — possibly built by hand — so only the assets are rebuilt.
+       */
+      test("reuses an existing image, rebuilding only the guest assets", async () => {
+        const { deps, calls } = harness({ localImages: ["my-devbox"] });
+
+        await expect(ensureImageAssets(buildSpec(), deps)).resolves.toBe(
+          "/store/built",
+        );
+        expect(calls.engineBuilds).toHaveLength(0);
+        expect(calls.buildAssets).toHaveLength(1);
+        expect(calls.logs.join("\n")).toMatch(/Using existing docker image/);
+      });
+
+      test("builds when the engine holds a different image", async () => {
+        const { deps, calls } = harness({ localImages: ["some-other-image"] });
+
+        await ensureImageAssets(buildSpec(), deps);
+        expect(calls.engineBuilds).toHaveLength(1);
+      });
+    });
+
+    describe("buildPolicy always", () => {
+      const s = buildSpec({ buildPolicy: "always" });
+
+      /**
+       * The cache key is the ref, which doesn't change when the Containerfile
+       * does — so reusing cached assets here would silently discard the image we
+       * just rebuilt, making "always" a no-op.
+       */
+      test("rebuilds the guest assets despite a cache hit", async () => {
+        const { deps, calls } = harness({ refs: [cachedRef(s, "x86_64")] });
+
+        await expect(ensureImageAssets(s, deps)).resolves.toBe("/store/built");
+        expect(calls.engineBuilds).toHaveLength(1);
+        expect(calls.buildAssets).toHaveLength(1);
+      });
+
+      test("rebuilds the image even though the engine already has it", async () => {
+        const { deps, calls } = harness({ localImages: ["my-devbox"] });
+
+        await ensureImageAssets(s, deps);
+        expect(calls.engineBuilds).toHaveLength(1);
+      });
+    });
+
+    test("does not build guest assets when the engine build fails", async () => {
+      const { deps, calls } = harness({
+        onEngineBuild: () => {
+          throw new Error("Containerfile step 3 failed");
+        },
+      });
+
+      await expect(ensureImageAssets(buildSpec(), deps)).rejects.toThrow(
+        "Containerfile step 3 failed",
+      );
+      expect(calls.buildAssets).toHaveLength(0);
+    });
+
+    test("releases the build lock when the engine build fails", async () => {
+      const lockPath = _lockPath(
+        _tuorImageRef(buildSpec(), "x86_64", FAKE_GONDOLIN_VERSION),
+      );
+      const { deps } = harness({
+        onEngineBuild: () => {
+          throw new Error("boom");
+        },
+      });
+
+      try {
+        await expect(ensureImageAssets(buildSpec(), deps)).rejects.toThrow();
+        expect(existsSync(lockPath)).toBe(false);
+      } finally {
+        rmSync(lockPath, { recursive: true, force: true });
+      }
+    });
+
+    test("bakes the rootfs size into the guest assets", async () => {
+      const { deps, calls } = harness();
+
+      await ensureImageAssets(buildSpec({ rootfsSizeMb: 8192 }), deps);
+      expect(builtConfig(calls).rootfs).toEqual({
+        ...getDefaultBuildConfig().rootfs,
+        sizeMb: 8192,
+      });
     });
   });
 

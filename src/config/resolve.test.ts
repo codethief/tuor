@@ -560,6 +560,85 @@ describe("createSessionSpecFromConfig", () => {
       const spec = resolve({ rootfs: {} });
       expect(spec.rootfs).toBeUndefined();
     });
+
+    describe("Containerfile variant", () => {
+      const image = {
+        ref: "my-devbox",
+        containerfile: "/proj/Containerfile",
+        context: "/proj",
+        buildPolicy: "always",
+      } as const;
+
+      test("passes the build image through untouched", () => {
+        expect(resolve({ rootfs: { image } }).rootfs?.image).toEqual(image);
+      });
+
+      /**
+       * Without these checks a typo'd path would only surface as a raw engine
+       * error, after the host-tool preflight and a sandbox-helper download.
+       */
+      test("rejects a containerfile that does not exist", () => {
+        const deps: ResolveDeps = {
+          ...validDeps,
+          mountValidation: {
+            pathExists: (p) => p !== "/proj/Containerfile",
+            isDirectory: () => true,
+          },
+        };
+        expect(() => resolve({ rootfs: { image } }, undefined, deps)).toThrow(
+          /rootfs\.image\.containerfile does not exist: \/proj\/Containerfile/,
+        );
+      });
+
+      test("rejects a context that does not exist", () => {
+        const deps: ResolveDeps = {
+          ...validDeps,
+          mountValidation: {
+            pathExists: (p) => p !== "/proj",
+            isDirectory: () => true,
+          },
+        };
+        expect(() => resolve({ rootfs: { image } }, undefined, deps)).toThrow(
+          /rootfs\.image\.context does not exist: \/proj/,
+        );
+      });
+
+      test("rejects a context that is not a directory", () => {
+        const deps: ResolveDeps = {
+          ...validDeps,
+          mountValidation: { pathExists: () => true, isDirectory: () => false },
+        };
+        expect(() => resolve({ rootfs: { image } }, undefined, deps)).toThrow(
+          /rootfs\.image\.context is not a directory/,
+        );
+      });
+
+      /** The pull variant has no host paths to check. */
+      test("checks no paths for a pull image", () => {
+        const deps: ResolveDeps = {
+          ...validDeps,
+          mountValidation: {
+            pathExists: () => false,
+            isDirectory: () => false,
+          },
+        };
+        expect(() =>
+          resolve(
+            {
+              rootfs: {
+                image: {
+                  ref: "alpine:3.23",
+                  pullPolicy: "if-not-present",
+                  buildPolicy: "if-not-present",
+                },
+              },
+            },
+            undefined,
+            deps,
+          ),
+        ).not.toThrow();
+      });
+    });
   });
 });
 
