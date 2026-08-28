@@ -16,7 +16,7 @@ Most of the features below are provided verbatim by Gondolin. For users familiar
 with Gondolin, please see [Differences to bare Gondolin](./docs/Differences.md).
 
 - **Isolation**: [Strong](./docs/FAQ.md), virtualization-based isolation between
-  workload and host system using QEMU as hypervisor with heavily constrained
+  workload and host system using QEMU as hypervisor with heavily restricted
   guest ↔ host communication.
 
 - **Ephemeral**: VM disk images are copy-on-write and treated as disposable
