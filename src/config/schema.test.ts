@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { findConfigDir, parseConfig } from "./schema.ts";
+import {
+  findConfigDir,
+  parseConfig,
+  type RootfsImageBuildConfig,
+  type RootfsImagePullConfig,
+  type TuorConfig,
+} from "./schema.ts";
 
 describe("findConfigDir", () => {
   test("returns config dir when config.json exists in start directory", () => {
@@ -369,14 +375,13 @@ describe("parseConfig", () => {
   });
 
   describe("resources config", () => {
-    test("accepts memory, cpus and rootfsSize", () => {
+    test("accepts memory and cpus", () => {
       const config = parseConfig({
-        resources: { memory: "2G", cpus: 4, rootfsSize: "8G" },
+        resources: { memory: "2G", cpus: 4 },
       });
       expect(config.resources).toEqual({
         memory: "2G",
         cpus: 4,
-        rootfsSize: "8G",
       });
     });
 
@@ -385,14 +390,213 @@ describe("parseConfig", () => {
       expect(config.resources).toEqual({ cpus: 8 });
     });
 
-    test("accepts memory without a unit suffix", () => {
-      const config = parseConfig({ resources: { memory: "1024" } });
-      expect(config.resources).toEqual({ memory: "1024" });
+    test.each([
+      "512M",
+      "2g",
+      "1T",
+      "1048576K",
+    ])("accepts memory: %s", (memory) => {
+      expect(parseConfig({ resources: { memory } }).resources).toEqual({
+        memory,
+      });
     });
 
     test("omits resources when not specified", () => {
       const config = parseConfig({});
       expect(config.resources).toBeUndefined();
+    });
+  });
+
+  describe("rootfs config", () => {
+    /** Narrow a parsed `rootfs.image` to the pull variant. */
+    function pullImage(config: TuorConfig): RootfsImagePullConfig {
+      const image = config.rootfs?.image;
+      if (!image || "containerfile" in image) {
+        throw new Error(`expected a pull-variant image, got ${image}`);
+      }
+      return image;
+    }
+
+    /** Narrow a parsed `rootfs.image` to the Containerfile variant. */
+    function buildImage(config: TuorConfig): RootfsImageBuildConfig {
+      const image = config.rootfs?.image;
+      if (!image || !("containerfile" in image)) {
+        throw new Error(`expected a build-variant image, got ${image}`);
+      }
+      return image;
+    }
+
+    test("accepts an image with just a ref", () => {
+      const config = parseConfig({
+        rootfs: { image: { ref: "docker.io/library/debian:bookworm-slim" } },
+      });
+      expect(config.rootfs).toEqual({
+        image: {
+          ref: "docker.io/library/debian:bookworm-slim",
+          pullPolicy: "if-not-present",
+          buildPolicy: "if-not-present",
+        },
+      });
+    });
+
+    test("defaults an omitted pullPolicy to if-not-present", () => {
+      const config = parseConfig({ rootfs: { image: { ref: "alpine:3.23" } } });
+      expect(pullImage(config).pullPolicy).toBe("if-not-present");
+    });
+
+    test("defaults an omitted buildPolicy to if-not-present", () => {
+      const config = parseConfig({ rootfs: { image: { ref: "alpine:3.23" } } });
+      expect(pullImage(config).buildPolicy).toBe("if-not-present");
+    });
+
+    test.each([
+      "if-not-present",
+      "always",
+    ])("accepts an explicit buildPolicy: %s", (buildPolicy) => {
+      const config = parseConfig({
+        rootfs: { image: { ref: "alpine:3.23", buildPolicy } },
+      });
+      expect(pullImage(config).buildPolicy).toBe(buildPolicy);
+    });
+
+    test("rejects buildPolicy 'never' on the pull variant", () => {
+      expect(() =>
+        parseConfig({
+          rootfs: { image: { ref: "alpine:3.23", buildPolicy: "never" } },
+        }),
+      ).toThrow();
+    });
+
+    test.each([
+      "if-not-present",
+      "always",
+      "never",
+    ])("accepts an explicit pullPolicy: %s", (pullPolicy) => {
+      const config = parseConfig({
+        rootfs: { image: { ref: "alpine:3.23", pullPolicy } },
+      });
+      expect(pullImage(config).pullPolicy).toBe(pullPolicy);
+    });
+
+    test.each(["docker", "podman"])("accepts engine: %s", (engine) => {
+      const config = parseConfig({
+        rootfs: { image: { ref: "alpine:3.23", engine } },
+      });
+      expect(config.rootfs?.image?.engine).toBe(engine);
+    });
+
+    test("accepts a size alongside an image", () => {
+      const config = parseConfig({
+        rootfs: { image: { ref: "alpine:3.23" }, size: "8G" },
+      });
+      expect(config.rootfs).toEqual({
+        image: {
+          ref: "alpine:3.23",
+          pullPolicy: "if-not-present",
+          buildPolicy: "if-not-present",
+        },
+        size: "8G",
+      });
+    });
+
+    test("accepts a bare size without an image", () => {
+      const config = parseConfig({ rootfs: { size: "512M" } });
+      expect(config.rootfs).toEqual({ size: "512M" });
+    });
+
+    test.each(["512M", "8g", "1T", "1048576K"])("accepts size: %s", (size) => {
+      expect(parseConfig({ rootfs: { size } }).rootfs).toEqual({ size });
+    });
+
+    test("omits rootfs when not specified", () => {
+      const config = parseConfig({});
+      expect(config.rootfs).toBeUndefined();
+    });
+
+    describe("Containerfile variant", () => {
+      const BUILD_IMAGE = {
+        ref: "my-devbox",
+        containerfile: "./Containerfile",
+        context: ".",
+        buildPolicy: "if-not-present",
+      };
+
+      test("accepts the minimal build image", () => {
+        const config = parseConfig({ rootfs: { image: BUILD_IMAGE } });
+        expect(config.rootfs?.image).toEqual(BUILD_IMAGE);
+      });
+
+      test("accepts an engine alongside it", () => {
+        const config = parseConfig({
+          rootfs: { image: { ...BUILD_IMAGE, engine: "podman" } },
+        });
+        expect(buildImage(config).engine).toBe("podman");
+      });
+
+      test.each([
+        "if-not-present",
+        "always",
+      ])("accepts buildPolicy: %s", (buildPolicy) => {
+        const config = parseConfig({
+          rootfs: { image: { ...BUILD_IMAGE, buildPolicy } },
+        });
+        expect(buildImage(config).buildPolicy).toBe(buildPolicy);
+      });
+
+      test.each([
+        "my-devbox",
+        "tuor/my-devbox",
+        "my-devbox:v1",
+        "registry.local/team/devbox:latest",
+        "550e8400-e29b-41d4-a716-446655440000",
+        "tuor.dev_01",
+      ])("accepts ref: %s", (ref) => {
+        const config = parseConfig({
+          rootfs: { image: { ...BUILD_IMAGE, ref } },
+        });
+        expect(buildImage(config).ref).toBe(ref);
+      });
+
+      test.each([
+        ["uppercase in the name", "MyDevbox"],
+        ["a digest you cannot build to", "my-devbox@sha256:abc"],
+        ["a leading dash", "-my-devbox"],
+        ["an empty ref", ""],
+      ])("rejects %s", (_what, ref) => {
+        expect(() =>
+          parseConfig({ rootfs: { image: { ...BUILD_IMAGE, ref } } }),
+        ).toThrow();
+      });
+
+      test.each([
+        ["containerfile", "context"],
+        ["context", "containerfile"],
+        ["buildPolicy", "buildPolicy"],
+      ])("rejects a build image missing %s", (missing) => {
+        const image: Record<string, unknown> = { ...BUILD_IMAGE };
+        delete image[missing];
+        expect(() => parseConfig({ rootfs: { image } })).toThrow();
+      });
+
+      /**
+       * The two variants are mutually exclusive: `pullPolicy` governs fetching
+       * an image that exists, `buildPolicy` producing one that doesn't.
+       */
+      test("rejects mixing pullPolicy into the build variant", () => {
+        expect(() =>
+          parseConfig({
+            rootfs: { image: { ...BUILD_IMAGE, pullPolicy: "never" } },
+          }),
+        ).toThrow();
+      });
+
+      test("rejects a containerfile without the rest of the variant", () => {
+        expect(() =>
+          parseConfig({
+            rootfs: { image: { ref: "x", containerfile: "./Containerfile" } },
+          }),
+        ).toThrow();
+      });
     });
   });
 
@@ -403,9 +607,33 @@ describe("parseConfig", () => {
     ["resources unknown field", { resources: { foo: "bar" } }],
     ["resources malformed memory", { resources: { memory: "2GB" } }],
     ["resources empty memory", { resources: { memory: "" } }],
+    [
+      "resources memory without a unit suffix",
+      { resources: { memory: "1024" } },
+    ],
     ["resources non-integer cpus", { resources: { cpus: 1.5 } }],
     ["resources zero cpus", { resources: { cpus: 0 } }],
     ["resources non-number cpus", { resources: { cpus: "4" } }],
+    ["rootfs unknown field", { rootfs: { foo: "bar" } }],
+    ["rootfs image without ref", { rootfs: { image: { engine: "docker" } } }],
+    ["rootfs image empty ref", { rootfs: { image: { ref: "" } } }],
+    [
+      "rootfs image unknown field",
+      { rootfs: { image: { ref: "alpine", platform: "linux/amd64" } } },
+    ],
+    [
+      "rootfs image bad engine",
+      { rootfs: { image: { ref: "alpine", engine: "containerd" } } },
+    ],
+    [
+      "rootfs image bad pullPolicy",
+      { rootfs: { image: { ref: "alpine", pullPolicy: "sometimes" } } },
+    ],
+    ["rootfs malformed size", { rootfs: { size: "8GB" } }],
+    ["rootfs size with a space", { rootfs: { size: "8 G" } }],
+    ["rootfs empty size", { rootfs: { size: "" } }],
+    ["rootfs non-string size", { rootfs: { size: 8192 } }],
+    ["rootfs size without a unit suffix", { rootfs: { size: "2048" } }],
     [
       "relative guestPath",
       { mounts: [{ hostPath: "/foo", guestPath: "rel" }] },

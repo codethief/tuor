@@ -7,6 +7,7 @@ import type {
   NetworkConfig,
   QemuConfig,
   ResourcesConfig,
+  RootfsConfig,
   TuorConfig,
 } from "./schema.ts";
 
@@ -85,11 +86,16 @@ export function mergeConfigs(layers: ConfigLayer[]): TuorConfig {
 
 // --- Internals ---
 
-/** Merge two configs where `child` overrides `parent`. */
+/**
+ * Merge two configs where `child` overrides `parent`.
+ *
+ * The behavior here should be kept in sync with the documentation in
+ * /docs/Configuration.md .
+ */
 function mergeTwoConfigs(parent: TuorConfig, child: TuorConfig): TuorConfig {
   return {
     // Scalars: child wins, falling back to parent when the child omits the
-    // field. guestUser/workdir carry no schema default anymore, so "omitted" is
+    // field. guestUser/workdir carry no schema default, so "omitted" is
     // genuinely undefined here — otherwise a child layer's silently-defaulted
     // value would clobber a value inherited from a parent layer. Their defaults
     // are applied post-merge in applyConfigDefaults.
@@ -105,6 +111,9 @@ function mergeTwoConfigs(parent: TuorConfig, child: TuorConfig): TuorConfig {
 
     // Resources: deep-merge each field, child field wins
     ...mergeResources(parent.resources, child.resources),
+
+    // Rootfs: merge field by field, child wins (`image` is atomic)
+    ...mergeRootfs(parent.rootfs, child.rootfs),
 
     // Arrays: concatenate
     ...mergeArrayField(parent.mounts, child.mounts, "mounts"),
@@ -206,6 +215,16 @@ function mergeResources(
   return { resources: { ...parentResources, ...childResources } };
 }
 
+function mergeRootfs(
+  parentRootfs: RootfsConfig | undefined,
+  childRootfs: RootfsConfig | undefined,
+): { rootfs: RootfsConfig } | Record<string, never> {
+  if (!parentRootfs && !childRootfs) return {} as Record<string, never>;
+  // Shallow merge: `size` is a scalar and `image` is atomic, so child wins for
+  // whichever keys it actually carries.
+  return { rootfs: { ...parentRootfs, ...childRootfs } };
+}
+
 function mergeStringArrayField<K extends string>(
   parentArr: string[] | undefined,
   childArr: string[] | undefined,
@@ -231,6 +250,30 @@ function preResolvePaths(layer: ConfigLayer): TuorConfig {
     ...(typeof config.workdir === "object"
       ? { workdir: preResolveMountPaths(config.workdir, configDir) }
       : {}),
+    ...(config.rootfs
+      ? { rootfs: preResolveRootfsPaths(config.rootfs, configDir) }
+      : {}),
+  };
+}
+
+/**
+ * Resolve a build-variant image's `containerfile`/`context` against the layer
+ * that declared them. Both are plain host paths — no tilde expansion, matching
+ * `host:` ignoreFileRefs.
+ */
+function preResolveRootfsPaths(
+  rootfs: RootfsConfig,
+  configDir: string,
+): RootfsConfig {
+  const { image } = rootfs;
+  if (!image || !("containerfile" in image)) return rootfs;
+  return {
+    ...rootfs,
+    image: {
+      ...image,
+      containerfile: resolve(configDir, image.containerfile),
+      context: resolve(configDir, image.context),
+    },
   };
 }
 

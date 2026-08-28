@@ -10,19 +10,56 @@ that VSCode uses, too. An informal specification (not by Microsoft) can be found
 at https://jsonc.org/.
 
 
-## Config inheritance
-Configs in child directories inherit from configs in parent directories (and so
-on), which in turn inherit from the global `~/.config/tuor/config.json`. In
-general, child settings override parent settings, except in the following cases:
-
-- Env vars, mounts, volumes get merged (shallow merge).
-- Boot commands are concatenated (parent commands run first).
-- Network: Child network mode overrides parent mode; allowed hosts are merged.
-
-
 ## Config options
 A detailed documentation of all config options is still work in progress. In the
 meantime, please refer to [`/src/config/schema.ts`](../src/config/schema.ts).
+
+
+## Config inheritance & merging
+Configs in child directories inherit from configs in parent directories (and so
+on), which in turn inherit from the global `~/.config/tuor/config.json`. The
+individual config files don't need to provide all settings that are required by
+the schema (see above); only the end result after merging them gets validated.
+
+Relative host path references in a given config file (e.g. `workdir: "../foo"`)
+are always evaluated relative to *that* config file's location, before it
+potentially gets merged with other configs.
+
+
+**How inheritance works:** In general, top-level settings in the child config
+override top-level settings in the parent config. However, in some cases
+settings are deep-merged and the config inheritance algorithm descends down the
+config schema tree, or values are concatenated with the parent config (e.g. in
+case of lists), as indicated below:
+
+```jsonc
+{
+  "bootCommands": [],  // concatenate with parent list (parent commands run first)
+  "env": {},  // concatenate/shallow-merge with parent dictionary
+  "guestUser?": {},  // override parent
+  "mounts": [],  // concatenate with parent list
+  "network": {
+    "mode": "",  // override parent
+    "allowedHosts": [],  // concatenate with parent list
+    "allowedInternalHosts": [], // concatenate with parent list
+  },
+  "qemu": {
+    "accel": "",  // override parent
+    "cpu": "",  // override parent
+    "machineType": "",  // override parent
+  },  // ?
+  "resources": {
+    "cpus": "",  // override parent
+    "memory": "",  // override parent
+  },  // ?
+  "rootfs": {
+    "image": {},  // override parent
+    "size": "",  // override parent
+  },
+  "volumes": [],  // concatenate with parent list
+  "workdir": {} /* or string value */,  // override parent
+}
+```
 
 
 ## Variables
@@ -36,7 +73,7 @@ is validated):
     // $PWD lets you mount wherever you launched Tuor from:
     { "hostPath": "$PWD", "guestPath": "/workspace", "mode": "readwrite" }
   ],
-  "resources": { "rootfsSize": "${ROOTFS_SIZE}" },
+  "rootfs": { "size": "${ROOTFS_SIZE}" },
   // Use $$ for a literal dollar sign:
   "env": { "PROMPT": "$$ " }
 }
@@ -109,12 +146,33 @@ that is not set on the host is an error.
   // `qemu.cpu` (the emulated CPU model).
   "resources": {
     "cpus": 4,          // vCPU count (positive integer)
-    "memory": "2G",     // RAM, QEMU syntax (e.g. "512M", "2G")
-    // Minimum virtual disk size (COW overlay, so actual host usage stays
-    // sparse). Note that the virtual disk will be discarded on VM shutdown,
-    // so it is not meant for persisting data across VM boots. (Use mounts &
-    // volumes, instead!)
-    "rootfsSize": "2G"
+    "memory": "2G"      // RAM, QEMU syntax (e.g. "512M", "2G")
+  },
+  "rootfs": {
+    "image": {
+      // Whole OCI image ref (`:tag` or `@sha256:…`). Omit the whole `image`
+      // block to boot Gondolin's default alpine-base image.
+      "ref": "docker.io/library/debian:bookworm-slim",
+      // Optional: container engine used to pull & export the image. Omit to let
+      // Gondolin auto-detect (docker, else podman).
+      "engine": "docker",
+      // Optional (default "if-not-present"): where the image comes from on the
+      // runs that build. "always" to re-pull every time, "never" to use the
+      // engine's local image store only (and fail if the image isn't in it).
+      "pullPolicy": "if-not-present",
+      // Optional (default "if-not-present"): whether to reuse the guest assets
+      // Tuor cached for this `ref`. "always" rebuilds them every run. Note that
+      // `ref`, not the image contents, is the cache identity, so a moving tag
+      // needs *this* set to "always" — `pullPolicy` alone won't refresh
+      // anything, because a cache hit skips the build that would pull.
+      "buildPolicy": "if-not-present"
+    },
+    // Optional: total rootfs size — a positive integer plus a *mandatory*
+    // K/M/G/T suffix. Grow-only (never shrinks).
+    // Note that the virtual disk is discarded on VM shutdown, so it is not
+    // meant for persisting data across VM boots. (Use mounts & volumes,
+    // instead!)
+    "size": "8G"
   },
   // Guest user (numeric uid/gid) the shell runs under and that mounted
   // directories are presented as owned by. `homedir` (optional, default /root)

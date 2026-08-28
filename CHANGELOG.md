@@ -1,9 +1,31 @@
 # Unreleased
 
+## Breaking changes
+- Config: Replaced `resources.rootfsSize` with a new `rootfs.size` setting (see
+  below) and added stricter up-front validation. The old field (theoretically)
+  accepted any non-empty string; the new one enforces a QEMU-compatible size
+  syntax – a positive integer with a *mandatory* K/M/G/T suffix.
+- Config: `resources.memory` now requires a mandatory unit suffix (K/M/G/T), for
+  consistency with `rootfs.size` (see above).
+
+
 ## Features
 - Config: `config.json` files are now parsed as
   [JSONC](https://en.wikipedia.org/wiki/JSON#JSONC), i.e. allow `// line` and
   `/* block */` comments as well as trailing commas.
+- Config: Add new `rootfs.image` setting to expose a [Gondolin
+  feature](https://earendil-works.github.io/gondolin/custom-images/) that allows
+  configuring a custom OCI container image to be used for the VM's rootfs
+  instead of Gondolin's default `alpine-base` image. (The kernel is still taken
+  from Alpine, though.) The OCI image can either be an existing one or it can be
+  built from a Dockerfile/Containerfile.
+- Config: The new `rootfs.size` setting can be used both with the default VM
+  rootfs (same behavior as the old `resources.rootfsSize`), in which case it
+  grows the file system after boot (using `resize2fs`), or with a custom image
+  (`rootfs.image`), in which case the size gets baked in at build time. At the
+  time of writing this, the first path remains blocked by
+  [gondolin#132](https://github.com/earendil-works/gondolin/issues/132), so
+  specifying a custom image can be used as a workaround.
 
 
 # 0.5.1 (2026-08-03)

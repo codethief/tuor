@@ -41,17 +41,19 @@ export type DefaultedConfig = Omit<
 
 /**
  * Fill the config-level defaults that don't come from the arktype schema:
- * `guestUser`, `workdir`, and `network` (block-all when omitted).
+ * `guestUser`, `workdir` and `network` (block-all when omitted).
  *
- * `guestUser`/`workdir` are defaulted *here* rather than in the schema so that a
- * child config layer that omits them doesn't clobber a value inherited from a
- * parent layer during merge (their "omitted" would otherwise be indistinguish-
- * able from an explicit default). This must run after `mergeConfigs`.
+ * These are defaulted *here* rather than in the schema so that a child config
+ * layer that omits them doesn't clobber a value inherited from a parent layer
+ * during merge (their "omitted" would otherwise be indistinguishable from an
+ * explicit default, because `parseConfig` runs per layer, before the merge).
+ * This must run after `mergeConfigs`.
  *
  * Pure and dependency-free. The remaining schema defaults (mount `mode`,
- * `nixLd`) are already applied by `parseConfig`; computed conversions (path
- * expansion, env/secret split, nix→mounts, overlay state dirs, …) are *not*
- * defaults and stay in {@link createSessionSpecFromConfig}.
+ * `nixLd`, `rootfs.image.pullPolicy`) are already applied by `parseConfig`;
+ * computed conversions (path expansion, env/secret split, nix→mounts, overlay
+ * state dirs, …) are *not* defaults and stay in
+ * {@link createSessionSpecFromConfig}.
  */
 export function applyConfigDefaults(config: TuorConfig): DefaultedConfig {
   const guestUser = config.guestUser ?? DEFAULT_GUEST_USER;
