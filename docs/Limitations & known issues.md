@@ -6,18 +6,6 @@ reason, the user (and his home dir) are currently hard-coded at the Tuor config
 level, though you could of course `su` to a non-root user inside the VM.
 
 
-## Running out of disk space; `resources.rootfsSize` currently does not work
-This is due to an [upstream
-bug](https://github.com/earendil-works/gondolin/issues/132) in Gondolin.
-
-Unfortunately, this means that writing significant data to the rootfs is not
-possible for now (outside directories like `/tmp` that are mounted as tmpfs).
-
-As a workaround you could assign more RAM (`resources.memory`) and increase the
-available space in `/tmp` (add `mount -o remount,size=2G /tmp` to your config's
-`bootCommands`).
-
-
 ## Mounts & volumes don't support creating Unix file sockets
 This is a limitation in Gondolin's `sandboxfs` FUSE, which does not support the
 `MKNOD` syscall. 
