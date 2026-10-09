@@ -37,3 +37,9 @@ defaults and fine-tune your config for each project. See
   ownership data (UID/GID) verbatim from the host to the guest. Tuor allows
   controlling the UID/GID of a mount or volume that the guest sees, independent
   of the files' real on-host ownership.
+
+- **No default tmpfs mounts**: By default, Gondolin makes `/tmp`, `/root`,
+  `/var/tmp`, `/var/cache`, `/var/log` tmpfs mounts that live in guest memory.
+  Tuor disables this behavior because RAM is precious and the VM disk is
+  ephemeral, anyway. You can still decide to re-enable the original behavior by
+  configuring appropriate `mounts` or `bootCommands`.
