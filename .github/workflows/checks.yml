@@ -24,11 +24,11 @@ jobs:
       - uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
         with:
           cache: true
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run lint
-      - run: npm run build
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm test
+      - run: pnpm run lint
+      - run: pnpm run build
 
   audit:
     name: Dependency audit
@@ -42,7 +42,7 @@ jobs:
       - uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
         with:
           cache: true
-      - run: npm audit --audit-level=moderate
+      - run: pnpm audit --audit-level=moderate
 
   workflow-audit:
     name: Workflow security audit

@@ -86,16 +86,19 @@ jobs:
       - uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
         with:
           cache: true
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
       - run: ./scripts/validate-version.ts "$VERSION" # format check
       - run: ./scripts/extract-notes.ts "$VERSION" /tmp/release-notes.md
-      - run: npm run build
+      - run: pnpm run build
       - name: Create GitHub Release (which creates the tag), then publish to npm
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # For now, we keep publishing through npm instead of pnpm since it's
+          # the official way and it's been working fine. (Publishing doesn't
+          # care about whether we use npm or pnpm to populate node_modules.)
           TARBALL=$(npm pack | tail -n1)
-          
+
           # Title uses the date from the CHANGELOG heading (not "today"), so it
           # matches the changelog even though the manual approval may land some
           # time after prepare.
