@@ -1,4 +1,5 @@
 import { existsSync, realpathSync } from "node:fs";
+import { dirname } from "node:path";
 import type { MountSpec, Owner } from "../core/mounts.ts";
 import type { NixConfig } from "./schema.ts";
 
@@ -7,6 +8,8 @@ import type { NixConfig } from "./schema.ts";
 type NixSetup = {
   mounts: MountSpec[];
   env: Record<string, string>;
+  /** Shell commands that must run in the guest before the workload starts. */
+  bootCommands: string[];
 };
 
 export type NixDeps = {
@@ -39,8 +42,9 @@ export function resolveNixSetup(
   }
 
   return {
-    mounts: buildMounts(config, defaultOwner, deps),
-    env: buildEnv(profiles, deps.hostEnv, deps.realpath, deps.warn),
+    mounts: buildMounts(defaultOwner),
+    env: buildEnv(config, profiles, deps.hostEnv, deps.realpath, deps.warn),
+    bootCommands: buildNixLdBootCommands(config, deps),
   };
 }
 
@@ -50,19 +54,29 @@ export function resolveNixSetup(
 const GONDOLIN_CA_BUNDLE = "/run/gondolin/ca-certificates.crt";
 
 /**
- * Env vars to forward from the host, resolved through symlinks so they point
- * into /nix/store (which is mounted in the guest). Entries whose resolved path
+ * An env var forwarded from the host, resolved through symlinks so it points
+ * into /nix/store (which is mounted in the guest). Values whose resolved path
  * doesn't land under /nix/ are dropped with a warning.
  *
- * "path-list" vars (like NIX_LD_LIBRARY_PATH) are colon-separated; each
- * component is resolved individually and non-/nix/ entries are filtered out.
+ * "path-list" vars are colon-separated; each component is resolved
+ * individually and non-/nix/ entries are filtered out.
  */
-const FORWARDED_ENV_VARS: { key: string; kind: "path" | "path-list" }[] = [
-  // TODO NIX_LD_LIBRARY_PATH should only be forwarded if config.nixLd is
-  //      enabled.
-  { key: "NIX_LD_LIBRARY_PATH", kind: "path-list" },
+type ForwardedEnvVar = { key: string; kind: "path" | "path-list" };
+
+/** Forwarded whenever Nix mode is enabled. */
+const FORWARDED_ENV_VARS: ForwardedEnvVar[] = [
   { key: "LOCALE_ARCHIVE", kind: "path" },
   { key: "TZDIR", kind: "path" },
+];
+
+/**
+ * Env vars that configure nix-ld itself, so they are only forwarded when
+ * `nixLd` is enabled. NIX_LD names the real glibc loader that the shim hands
+ * off to — without it the shim aborts, so forwarding it is not optional.
+ */
+const NIX_LD_ENV_VARS: ForwardedEnvVar[] = [
+  { key: "NIX_LD", kind: "path" },
+  { key: "NIX_LD_LIBRARY_PATH", kind: "path-list" },
 ];
 
 /**
@@ -82,18 +96,19 @@ function resolveExplicitProfiles(profiles: string[], deps: NixDeps): string[] {
 }
 
 /**
- * The directory holding the glibc dynamic loader, which nix-ld replaces with
- * its own shim. Its name is arch-dependent: x86-64 puts the loader in
- * /lib64/ld-linux-x86-64.so.2, aarch64 in /lib/ld-linux-aarch64.so.1.
+ * Full path of the glibc dynamic loader, which nix-ld replaces with its own
+ * shim. Both the directory and the file name are arch-dependent: x86-64 puts
+ * the loader in /lib64/ld-linux-x86-64.so.2, aarch64 in
+ * /lib/ld-linux-aarch64.so.1.
  *
  * Takes a Node.js `process.arch` value.
  */
-export function _loaderDir(hostArch: string): string {
+export function _loaderPath(hostArch: string): string {
   switch (hostArch) {
     case "x64":
-      return "/lib64";
+      return "/lib64/ld-linux-x86-64.so.2";
     case "arm64":
-      return "/lib";
+      return "/lib/ld-linux-aarch64.so.1";
     default:
       throw new Error(
         `nixLd is enabled but the host architecture "${hostArch}" is not ` +
@@ -102,12 +117,42 @@ export function _loaderDir(hostArch: string): string {
   }
 }
 
-function buildMounts(
-  config: NixConfig,
-  defaultOwner: Owner,
-  deps: NixDeps,
-): MountSpec[] {
-  const mounts: MountSpec[] = [
+/**
+ * Symlink nix-ld's shim into place inside the guest.
+ *
+ * We deliberately do *not* mount the host's loader directory onto the guest's.
+ * On aarch64 that directory is /lib, which in the guest holds musl's own
+ * loader plus /lib/apk and /lib/modules; shadowing it leaves the guest unable
+ * to exec anything at all. Linking the single file we actually need sidesteps
+ * that, and costs no extra mount: the shim lives in /nix/store, which Nix mode
+ * already mounts.
+ */
+function buildNixLdBootCommands(config: NixConfig, deps: NixDeps): string[] {
+  if (!config.nixLd) return [];
+
+  const loaderPath = _loaderPath(deps.hostArch);
+  if (!deps.pathExists(loaderPath)) {
+    throw new Error(
+      `nixLd is enabled but ${loaderPath} does not exist on the host. ` +
+        "Is nix-ld installed?",
+    );
+  }
+
+  // The host's loader is a symlink into /nix/store; resolve it so the guest
+  // link points at something reachable through the /nix mount.
+  const target = deps.realpath(loaderPath);
+  if (!target.startsWith("/nix/")) {
+    throw new Error(
+      `nixLd is enabled but ${loaderPath} resolves to "${target}", which is ` +
+        "not under /nix/ and therefore not reachable inside the guest.",
+    );
+  }
+
+  return [`mkdir -p ${dirname(loaderPath)} && ln -sf ${target} ${loaderPath}`];
+}
+
+function buildMounts(defaultOwner: Owner): MountSpec[] {
+  return [
     {
       hostPath: "/nix",
       guestPath: "/nix",
@@ -116,28 +161,10 @@ function buildMounts(
       owner: defaultOwner,
     },
   ];
-
-  if (config.nixLd) {
-    const loaderDir = _loaderDir(deps.hostArch);
-    if (!deps.pathExists(loaderDir)) {
-      throw new Error(
-        `nixLd is enabled but ${loaderDir} does not exist on the host. ` +
-          "Is nix-ld installed?",
-      );
-    }
-    mounts.push({
-      hostPath: loaderDir,
-      guestPath: loaderDir,
-      mode: "readonly",
-      shadowPatterns: [],
-      owner: defaultOwner,
-    });
-  }
-
-  return mounts;
 }
 
 function buildEnv(
+  config: NixConfig,
   profiles: string[],
   hostEnv: Record<string, string | undefined>,
   realpath: (path: string) => string,
@@ -150,7 +177,11 @@ function buildEnv(
     NIX_SSL_CERT_FILE: GONDOLIN_CA_BUNDLE,
   };
 
-  for (const { key, kind } of FORWARDED_ENV_VARS) {
+  const forwarded = config.nixLd
+    ? [...FORWARDED_ENV_VARS, ...NIX_LD_ENV_VARS]
+    : FORWARDED_ENV_VARS;
+
+  for (const { key, kind } of forwarded) {
     const value = hostEnv[key];
     if (value === undefined) continue;
 

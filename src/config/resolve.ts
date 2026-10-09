@@ -118,6 +118,13 @@ export function createSessionSpecFromConfig(
   const qemu = resolveQemu(config.qemu);
   const resources = resolveResources(config.resources);
 
+  // Nix's own boot commands (currently just the nix-ld symlink) run first so
+  // that user-provided bootCommands can already rely on the setup they do.
+  const bootCommands = [
+    ...(nixSetup?.bootCommands ?? []),
+    ...(config.bootCommands ?? []),
+  ];
+
   return {
     workdir: guestWorkdir,
     network: config.network,
@@ -127,9 +134,7 @@ export function createSessionSpecFromConfig(
     ...(hasEnv ? { env: mergedEnv } : {}),
     ...(hasSecrets ? { secrets } : {}),
     ...(qemu ? { qemu } : {}),
-    ...(config.bootCommands && config.bootCommands.length > 0
-      ? { bootCommands: config.bootCommands }
-      : {}),
+    ...(bootCommands.length > 0 ? { bootCommands } : {}),
   };
 }
 

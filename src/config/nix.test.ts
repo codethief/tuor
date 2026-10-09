@@ -5,6 +5,21 @@ import {
   resolveNixSetup,
 } from "./nix.ts";
 
+const LOADER_X64 = "/lib64/ld-linux-x86-64.so.2";
+const LOADER_ARM64 = "/lib/ld-linux-aarch64.so.1";
+const NIX_LD_SHIM = "/nix/store/abc-nix-ld/bin/nix-ld";
+
+/**
+ * realpath stub: resolves the host's loader symlink into /nix/store (as a
+ * nix-ld host does), plus whatever extra mappings a test needs.
+ */
+function realpathWith(map: Record<string, string> = {}) {
+  return (p: string) => {
+    if (map[p] !== undefined) return map[p];
+    return p === LOADER_X64 || p === LOADER_ARM64 ? NIX_LD_SHIM : p;
+  };
+}
+
 const baseDeps: NixDeps = {
   hostEnv: {},
   hostArch: "x64",
@@ -12,7 +27,7 @@ const baseDeps: NixDeps = {
     "/nix/store/abc-system-path",
     "/nix/store/xyz-user-env",
   ],
-  realpath: (p) => p,
+  realpath: realpathWith(),
   pathExists: () => true,
   warn: () => {},
 };
@@ -49,38 +64,13 @@ describe("resolveNixSetup", () => {
       );
     });
 
-    test("does not mount the loader dir by default", () => {
-      const { mounts } = resolveNixSetup({ nixLd: false }, deps());
-      expect(mounts.map((m) => m.guestPath)).toEqual(["/nix"]);
-    });
-
-    test("mounts /lib64 read-only when nixLd is true on x64", () => {
-      const { mounts } = resolveNixSetup(
-        { nixLd: true },
-        deps({ hostArch: "x64" }),
-      );
-      expect(mounts).toContainEqual(
-        expect.objectContaining({
-          hostPath: "/lib64",
-          guestPath: "/lib64",
-          mode: "readonly",
-        }),
-      );
-    });
-
-    test("mounts /lib read-only when nixLd is true on arm64", () => {
-      const { mounts } = resolveNixSetup(
-        { nixLd: true },
-        deps({ hostArch: "arm64" }),
-      );
-      expect(mounts).toContainEqual(
-        expect.objectContaining({
-          hostPath: "/lib",
-          guestPath: "/lib",
-          mode: "readonly",
-        }),
-      );
-      expect(mounts.find((m) => m.guestPath === "/lib64")).toBeUndefined();
+    test("mounts nothing but /nix, even when nixLd is enabled", () => {
+      // The loader is symlinked rather than mounted — mounting the host's
+      // loader dir would shadow the guest's own /lib on aarch64.
+      for (const nixLd of [false, true]) {
+        const { mounts } = resolveNixSetup({ nixLd }, deps());
+        expect(mounts.map((m) => m.guestPath)).toEqual(["/nix"]);
+      }
     });
 
     test("nix mounts have empty shadowPatterns", () => {
@@ -89,17 +79,56 @@ describe("resolveNixSetup", () => {
         expect(mount.shadowPatterns).toEqual([]);
       }
     });
+  });
 
-    test("throws when nixLd is true but the loader dir does not exist", () => {
+  describe("nixLd boot commands", () => {
+    test("emits no boot commands when nixLd is disabled", () => {
+      const { bootCommands } = resolveNixSetup({ nixLd: false }, deps());
+      expect(bootCommands).toEqual([]);
+    });
+
+    test("symlinks the shim to the x64 loader path", () => {
+      const { bootCommands } = resolveNixSetup(
+        { nixLd: true },
+        deps({ hostArch: "x64" }),
+      );
+      expect(bootCommands).toEqual([
+        `mkdir -p /lib64 && ln -sf ${NIX_LD_SHIM} ${LOADER_X64}`,
+      ]);
+    });
+
+    test("symlinks the shim to the arm64 loader path", () => {
+      const { bootCommands } = resolveNixSetup(
+        { nixLd: true },
+        deps({ hostArch: "arm64" }),
+      );
+      expect(bootCommands).toEqual([
+        `mkdir -p /lib && ln -sf ${NIX_LD_SHIM} ${LOADER_ARM64}`,
+      ]);
+    });
+
+    test("throws when the host loader does not exist", () => {
       expect(() =>
         resolveNixSetup(
           { nixLd: true },
-          deps({ hostArch: "arm64", pathExists: (p) => p !== "/lib" }),
+          deps({
+            hostArch: "arm64",
+            pathExists: (p) => p !== LOADER_ARM64,
+          }),
         ),
-      ).toThrow("/lib does not exist");
+      ).toThrow(`${LOADER_ARM64} does not exist`);
     });
 
-    test("throws when nixLd is true on an unsupported architecture", () => {
+    test("throws when the host loader does not resolve under /nix/", () => {
+      expect(() =>
+        resolveNixSetup(
+          { nixLd: true },
+          deps({ hostArch: "arm64", realpath: (p) => p }),
+        ),
+      ).toThrow("not under /nix/");
+    });
+
+    test("throws on an unsupported architecture", () => {
       expect(() =>
         resolveNixSetup({ nixLd: true }, deps({ hostArch: "s390x" })),
       ).toThrow('architecture "s390x" is not supported');
@@ -157,31 +186,57 @@ describe("resolveNixSetup", () => {
 
     test("resolves NIX_LD_LIBRARY_PATH entries through symlinks", () => {
       const { env } = resolveNixSetup(
-        { nixLd: false },
+        { nixLd: true },
         deps({
           hostEnv: { NIX_LD_LIBRARY_PATH: "/run/current-system/sw/lib" },
-          realpath: (p) =>
-            p === "/run/current-system/sw/lib" ? "/nix/store/abc-libs/lib" : p,
+          realpath: realpathWith({
+            "/run/current-system/sw/lib": "/nix/store/abc-libs/lib",
+          }),
         }),
       );
       expect(env.NIX_LD_LIBRARY_PATH).toBe("/nix/store/abc-libs/lib");
     });
 
-    test("resolves multiple colon-separated NIX_LD_LIBRARY_PATH entries", () => {
+    test("resolves NIX_LD through symlinks", () => {
+      const { env } = resolveNixSetup(
+        { nixLd: true },
+        deps({
+          hostEnv: { NIX_LD: "/run/current-system/sw/share/nix-ld/lib/ld.so" },
+          realpath: realpathWith({
+            "/run/current-system/sw/share/nix-ld/lib/ld.so":
+              "/nix/store/abc-glibc/lib/ld-linux-x86-64.so.2",
+          }),
+        }),
+      );
+      expect(env.NIX_LD).toBe("/nix/store/abc-glibc/lib/ld-linux-x86-64.so.2");
+    });
+
+    test("does not forward nix-ld env vars when nixLd is disabled", () => {
       const { env } = resolveNixSetup(
         { nixLd: false },
+        deps({
+          hostEnv: {
+            NIX_LD: "/nix/store/abc-glibc/lib/ld.so",
+            NIX_LD_LIBRARY_PATH: "/nix/store/abc-libs/lib",
+          },
+        }),
+      );
+      expect(env).not.toHaveProperty("NIX_LD");
+      expect(env).not.toHaveProperty("NIX_LD_LIBRARY_PATH");
+    });
+
+    test("resolves multiple colon-separated NIX_LD_LIBRARY_PATH entries", () => {
+      const { env } = resolveNixSetup(
+        { nixLd: true },
         deps({
           hostEnv: {
             NIX_LD_LIBRARY_PATH:
               "/run/current-system/sw/lib:/run/current-system/sw/lib64",
           },
-          realpath: (p) => {
-            const map: Record<string, string> = {
-              "/run/current-system/sw/lib": "/nix/store/abc/lib",
-              "/run/current-system/sw/lib64": "/nix/store/xyz/lib64",
-            };
-            return map[p] ?? p;
-          },
+          realpath: realpathWith({
+            "/run/current-system/sw/lib": "/nix/store/abc/lib",
+            "/run/current-system/sw/lib64": "/nix/store/xyz/lib64",
+          }),
         }),
       );
       expect(env.NIX_LD_LIBRARY_PATH).toBe(
@@ -191,13 +246,14 @@ describe("resolveNixSetup", () => {
 
     test("filters out NIX_LD_LIBRARY_PATH entries that don't resolve under /nix/", () => {
       const { env } = resolveNixSetup(
-        { nixLd: false },
+        { nixLd: true },
         deps({
           hostEnv: {
             NIX_LD_LIBRARY_PATH: "/usr/lib:/run/current-system/sw/lib",
           },
-          realpath: (p) =>
-            p === "/run/current-system/sw/lib" ? "/nix/store/abc/lib" : p,
+          realpath: realpathWith({
+            "/run/current-system/sw/lib": "/nix/store/abc/lib",
+          }),
         }),
       );
       expect(env.NIX_LD_LIBRARY_PATH).toBe("/nix/store/abc/lib");
@@ -205,7 +261,7 @@ describe("resolveNixSetup", () => {
 
     test("omits NIX_LD_LIBRARY_PATH entirely when no entries resolve under /nix/", () => {
       const { env } = resolveNixSetup(
-        { nixLd: false },
+        { nixLd: true },
         deps({
           hostEnv: { NIX_LD_LIBRARY_PATH: "/usr/lib" },
         }),
@@ -214,7 +270,7 @@ describe("resolveNixSetup", () => {
     });
 
     test("omits NIX_LD_LIBRARY_PATH when not on host", () => {
-      const { env } = resolveNixSetup({ nixLd: false }, deps({ hostEnv: {} }));
+      const { env } = resolveNixSetup({ nixLd: true }, deps({ hostEnv: {} }));
       expect(env).not.toHaveProperty("NIX_LD_LIBRARY_PATH");
     });
 
@@ -301,7 +357,7 @@ describe("resolveNixSetup", () => {
     test("warns for each dropped entry in a path-list", () => {
       const warnings: string[] = [];
       resolveNixSetup(
-        { nixLd: false },
+        { nixLd: true },
         deps({
           hostEnv: { NIX_LD_LIBRARY_PATH: "/usr/lib:/opt/lib" },
           warn: (msg) => warnings.push(msg),

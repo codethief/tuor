@@ -257,10 +257,12 @@ const types = scope({
     "profiles?": "AbsolutePath[]",
     /**
      * Enable nix-ld support:
-     * - Mount the host's dynamic loader directory read-only. Which one that is
-     *   depends on the host architecture: /lib64 on x86-64, /lib on aarch64.
-     * - Forward NIX_LD_LIBRARY_PATH env var to the guest, after resolving it to
-     *   a /nix/store path.
+     * - Symlink the host's nix-ld shim to the path the guest's glibc binaries
+     *   expect. Which path that is depends on the host architecture:
+     *   /lib64/ld-linux-x86-64.so.2 on x86-64, /lib/ld-linux-aarch64.so.1 on
+     *   aarch64. The shim itself is read through the /nix mount.
+     * - Forward the NIX_LD and NIX_LD_LIBRARY_PATH env vars to the guest, after
+     *   resolving them to /nix/store paths.
      */
     nixLd: "boolean = false",
   },
