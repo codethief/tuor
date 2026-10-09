@@ -7,13 +7,13 @@ import {
 
 const baseDeps: NixDeps = {
   hostEnv: {},
+  hostArch: "x64",
   resolveProfiles: () => [
     "/nix/store/abc-system-path",
     "/nix/store/xyz-user-env",
   ],
   realpath: (p) => p,
-  nixExists: () => true,
-  lib64Exists: () => true,
+  pathExists: () => true,
   warn: () => {},
 };
 
@@ -24,7 +24,10 @@ function deps(overrides: Partial<NixDeps> = {}): NixDeps {
 describe("resolveNixSetup", () => {
   test("throws when /nix does not exist", () => {
     expect(() =>
-      resolveNixSetup({ nixLd: false }, deps({ nixExists: () => false })),
+      resolveNixSetup(
+        { nixLd: false },
+        deps({ pathExists: (p) => p !== "/nix" }),
+      ),
     ).toThrow("/nix does not exist");
   });
 
@@ -46,13 +49,16 @@ describe("resolveNixSetup", () => {
       );
     });
 
-    test("does not mount /lib64 by default", () => {
+    test("does not mount the loader dir by default", () => {
       const { mounts } = resolveNixSetup({ nixLd: false }, deps());
-      expect(mounts.find((m) => m.guestPath === "/lib64")).toBeUndefined();
+      expect(mounts.map((m) => m.guestPath)).toEqual(["/nix"]);
     });
 
-    test("mounts /lib64 read-only when nixLd is true", () => {
-      const { mounts } = resolveNixSetup({ nixLd: true }, deps());
+    test("mounts /lib64 read-only when nixLd is true on x64", () => {
+      const { mounts } = resolveNixSetup(
+        { nixLd: true },
+        deps({ hostArch: "x64" }),
+      );
       expect(mounts).toContainEqual(
         expect.objectContaining({
           hostPath: "/lib64",
@@ -62,6 +68,21 @@ describe("resolveNixSetup", () => {
       );
     });
 
+    test("mounts /lib read-only when nixLd is true on arm64", () => {
+      const { mounts } = resolveNixSetup(
+        { nixLd: true },
+        deps({ hostArch: "arm64" }),
+      );
+      expect(mounts).toContainEqual(
+        expect.objectContaining({
+          hostPath: "/lib",
+          guestPath: "/lib",
+          mode: "readonly",
+        }),
+      );
+      expect(mounts.find((m) => m.guestPath === "/lib64")).toBeUndefined();
+    });
+
     test("nix mounts have empty shadowPatterns", () => {
       const { mounts } = resolveNixSetup({ nixLd: true }, deps());
       for (const mount of mounts) {
@@ -69,10 +90,19 @@ describe("resolveNixSetup", () => {
       }
     });
 
-    test("throws when nixLd is true but /lib64 does not exist", () => {
+    test("throws when nixLd is true but the loader dir does not exist", () => {
       expect(() =>
-        resolveNixSetup({ nixLd: true }, deps({ lib64Exists: () => false })),
-      ).toThrow("/lib64 does not exist");
+        resolveNixSetup(
+          { nixLd: true },
+          deps({ hostArch: "arm64", pathExists: (p) => p !== "/lib" }),
+        ),
+      ).toThrow("/lib does not exist");
+    });
+
+    test("throws when nixLd is true on an unsupported architecture", () => {
+      expect(() =>
+        resolveNixSetup({ nixLd: true }, deps({ hostArch: "s390x" })),
+      ).toThrow('architecture "s390x" is not supported');
     });
   });
 

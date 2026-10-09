@@ -5,6 +5,11 @@
   [JSONC](https://en.wikipedia.org/wiki/JSON#JSONC), i.e. allow `// line` and
   `/* block */` comments as well as trailing commas.
 
+## Bug fixes
+- Nix: `nixLd` unconditionally mounted `/lib64`, so it failed on aarch64 hosts,
+  where glibc's dynamic loader (and hence nix-ld's shim) lives in `/lib`. The
+  mounted directory is now picked based on the host architecture.
+
 
 # 0.5.1 (2026-08-03)
 

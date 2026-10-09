@@ -312,10 +312,10 @@ describe("createSessionSpecFromConfig", () => {
   describe("nix integration", () => {
     const nixDeps: NixDeps = {
       hostEnv: {},
+      hostArch: "x64",
       resolveProfiles: () => ["/nix/store/abc"],
       realpath: (p) => p,
-      nixExists: () => true,
-      lib64Exists: () => true,
+      pathExists: () => true,
       warn: () => {},
     };
 
@@ -632,10 +632,10 @@ describe("createSessionSpecFromConfig env integration", () => {
   test("user env overrides nix env", () => {
     const nixDeps: NixDeps = {
       hostEnv: {},
+      hostArch: "x64",
       resolveProfiles: () => ["/nix/store/abc"],
       realpath: (p) => p,
-      nixExists: () => true,
-      lib64Exists: () => true,
+      pathExists: () => true,
       warn: () => {},
     };
     const spec = resolve(
@@ -649,10 +649,10 @@ describe("createSessionSpecFromConfig env integration", () => {
   test("nix env preserved when user env does not overlap", () => {
     const nixDeps: NixDeps = {
       hostEnv: {},
+      hostArch: "x64",
       resolveProfiles: () => ["/nix/store/abc"],
       realpath: (p) => p,
-      nixExists: () => true,
-      lib64Exists: () => true,
+      pathExists: () => true,
       warn: () => {},
     };
     const spec = resolve(

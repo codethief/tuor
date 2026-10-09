@@ -11,10 +11,10 @@ type NixSetup = {
 
 export type NixDeps = {
   hostEnv: Record<string, string | undefined>;
+  hostArch: string;
   resolveProfiles: () => string[];
   realpath: (path: string) => string;
-  nixExists: () => boolean;
-  lib64Exists: () => boolean;
+  pathExists: (path: string) => boolean;
   warn: (message: string) => void;
 };
 
@@ -25,7 +25,7 @@ export function resolveNixSetup(
   deps: NixDeps = defaultNixDeps,
   defaultOwner: Owner = { uid: 0, gid: 0 },
 ): NixSetup {
-  if (!deps.nixExists()) {
+  if (!deps.pathExists("/nix")) {
     throw new Error("/nix does not exist on the host. Is Nix installed?");
   }
 
@@ -81,6 +81,27 @@ function resolveExplicitProfiles(profiles: string[], deps: NixDeps): string[] {
   });
 }
 
+/**
+ * The directory holding the glibc dynamic loader, which nix-ld replaces with
+ * its own shim. Its name is arch-dependent: x86-64 puts the loader in
+ * /lib64/ld-linux-x86-64.so.2, aarch64 in /lib/ld-linux-aarch64.so.1.
+ *
+ * Takes a Node.js `process.arch` value.
+ */
+export function _loaderDir(hostArch: string): string {
+  switch (hostArch) {
+    case "x64":
+      return "/lib64";
+    case "arm64":
+      return "/lib";
+    default:
+      throw new Error(
+        `nixLd is enabled but the host architecture "${hostArch}" is not ` +
+          "supported. Supported architectures: x64, arm64.",
+      );
+  }
+}
+
 function buildMounts(
   config: NixConfig,
   defaultOwner: Owner,
@@ -97,15 +118,16 @@ function buildMounts(
   ];
 
   if (config.nixLd) {
-    if (!deps.lib64Exists()) {
+    const loaderDir = _loaderDir(deps.hostArch);
+    if (!deps.pathExists(loaderDir)) {
       throw new Error(
-        "nixLd is enabled but /lib64 does not exist on the host. " +
+        `nixLd is enabled but ${loaderDir} does not exist on the host. ` +
           "Is nix-ld installed?",
       );
     }
     mounts.push({
-      hostPath: "/lib64",
-      guestPath: "/lib64",
+      hostPath: loaderDir,
+      guestPath: loaderDir,
       mode: "readonly",
       shadowPatterns: [],
       owner: defaultOwner,
@@ -208,9 +230,9 @@ export function _resolveDefaultProfiles(
 
 const defaultNixDeps: NixDeps = {
   hostEnv: process.env,
+  hostArch: process.arch,
   resolveProfiles: () => _resolveDefaultProfiles(process.env),
   realpath: realpathSync,
-  nixExists: () => existsSync("/nix"),
-  lib64Exists: () => existsSync("/lib64"),
+  pathExists: existsSync,
   warn: (message) => console.warn(`[nix] ${message}`),
 };
