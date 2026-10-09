@@ -6,9 +6,18 @@
   `/* block */` comments as well as trailing commas.
 
 ## Bug fixes
-- Nix: `nixLd` unconditionally mounted `/lib64`, so it failed on aarch64 hosts,
-  where glibc's dynamic loader (and hence nix-ld's shim) lives in `/lib`. The
-  mounted directory is now picked based on the host architecture.
+- Nix: `nixLd` mounted the host's dynamic loader directory into the guest. On
+  aarch64 that directory is `/lib`, so the mount shadowed the guest's own
+  `/lib` — musl's loader included — leaving the guest unable to execute
+  anything and panicking during boot. Tuor now symlinks just nix-ld's shim to
+  the path glibc binaries expect, and mounts nothing beyond `/nix`. (x86-64 was
+  unaffected: there the loader lives in `/lib64`, which the guest does not use.)
+- Nix: `nixLd` never forwarded `NIX_LD`, which tells nix-ld's shim where the
+  real glibc loader is. Without it the shim aborts instead of running the
+  binary, so `nixLd` could not work on any architecture. It is now forwarded,
+  resolved to a `/nix/store` path.
+- Nix: `NIX_LD_LIBRARY_PATH` is now only forwarded when `nixLd` is enabled,
+  rather than whenever Nix mode is on.
 
 
 # 0.5.1 (2026-08-03)
