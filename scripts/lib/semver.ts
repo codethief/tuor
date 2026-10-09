@@ -19,7 +19,7 @@ export function assertValid(version: string): string {
 
 /**
  * Throws unless `next` is a strictly greater semantic version than `current`. Both
- * inputs are format-validated first. `npm version` itself only rejects an *unchanged*
+ * inputs are format-validated first. `pnpm version` itself only rejects an *unchanged*
  * version, so this is what actually blocks downgrades.
  */
 export function assertGreater(current: string, next: string): void {
