@@ -95,6 +95,10 @@ export async function runSession(
     ...(hasEnv ? { env: mergedEnv } : {}),
     ...(hasVfsMounts ? { vfs: { mounts: vfsMounts } } : {}),
     sandbox: spec.qemu,
+    tmpfs: {},
+    // ^Disable default tmpfs mounts (/tmp, /var/log, etc.), i.e. don't keep
+    // those folders in memory. RAM is more precious than disk space. Besides,
+    // when the VM terminates, the rootfs is purged from disk, anyway.
   });
 
   if (spec.bootCommands && spec.bootCommands.length > 0) {

@@ -9,6 +9,11 @@
   for details. Among other things, this fixes `resources.rootfsSize`, which
   previously had no effect due to an [upstream
   bug](https://github.com/earendil-works/gondolin/issues/132).
+- Disable Gondolin's default tmpfs mounts (i.e. set `tmpfs: {}` in Gondolin's
+  `VMOptions`). In other words: `/tmp`, `/root`, `/var/tmp`, `/var/cache`,
+  `/var/log` will now be stored on the (ephemeral) VM disk and no longer take up
+  guest RAM. See also the related [upstream
+  issue](https://github.com/earendil-works/gondolin/issues/133).
 
 
 ## Bug fixes
