@@ -257,7 +257,8 @@ const types = scope({
     "profiles?": "AbsolutePath[]",
     /**
      * Enable nix-ld support:
-     * - Mount /lib64 (read-only)
+     * - Mount the host's dynamic loader directory read-only. Which one that is
+     *   depends on the host architecture: /lib64 on x86-64, /lib on aarch64.
      * - Forward NIX_LD_LIBRARY_PATH env var to the guest, after resolving it to
      *   a /nix/store path.
      */
