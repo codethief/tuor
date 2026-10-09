@@ -4,6 +4,12 @@
 - Config: `config.json` files are now parsed as
   [JSONC](https://en.wikipedia.org/wiki/JSON#JSONC), i.e. allow `// line` and
   `/* block */` comments as well as trailing commas.
+- Update Gondolin from v0.12.0 to v0.13.0. See Gondolin's
+  [CHANGELOG](https://github.com/earendil-works/gondolin/blob/main/CHANGELOG.md#0130)
+  for details. Among other things, this fixes `resources.rootfsSize`, which
+  previously had no effect due to an [upstream
+  bug](https://github.com/earendil-works/gondolin/issues/132).
+
 
 ## Bug fixes
 - Nix: `nixLd` mounted the host's dynamic loader directory into the guest. On
