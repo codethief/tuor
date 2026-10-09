@@ -1,5 +1,8 @@
 # Unreleased
 
+
+# 0.6.0 (2026-10-09)
+
 ## Features
 - Config: `config.json` files are now parsed as
   [JSONC](https://en.wikipedia.org/wiki/JSON#JSONC), i.e. allow `// line` and
