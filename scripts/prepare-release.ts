@@ -8,7 +8,7 @@ import { assertGreater, assertValid } from "./lib/semver.ts";
 // Local release prep. Must be run from a clean, up-to-date `master` checkout.
 // From there it:
 // - validates that the target version increases,
-// - branches off master, bumps package.json + lockfile,
+// - branches off master, bumps package.json,
 // - rolls the CHANGELOG's `# Unreleased` section into a dated one,
 // - commits,
 // - pushes `release/vX`, and
@@ -71,13 +71,14 @@ console.log(
 
 // Apply: branch off master (HEAD), bump, roll, commit, push.
 run("git", "switch", "--create", branch);
-run("npm", "version", version, "--no-git-tag-version"); // bumps package.json + package-lock.json
+// Bumps package.json only — unlike package-lock.json, pnpm-lock.yaml does not
+// record the root project's own version, so there is no lockfile to commit.
+run("pnpm", "version", version, "--no-git-tag-version");
 writeFileSync(join(repoRoot, "CHANGELOG.md"), rolledChangelog);
 run(
   "git",
   "commit",
   "package.json",
-  "package-lock.json",
   "CHANGELOG.md",
   "-m",
   `Release v${version}`,
