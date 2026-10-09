@@ -41,3 +41,20 @@ mkdir -p /tmp/gnupg && chmod 700 /tmp/gnupg
 
 as `bootCommand` and set `GNUPGHOME=/tmp/gnupg` as env var to store the entire
 `.gnupg` directory outside the mounted home dir.
+
+
+## VM hangs during bootup on arm64 Linux hosts that are themselves VMs under Apple Virtualization on Apple Silicon
+This occurs, e.g., when running Tuor in a Linux VM inside UTM on an Apple
+Silicon Mac, using UTM's Apple Virtualization option (instead of QEMU).
+
+Add this to your config to work around the issue:
+
+```jsonc
+{
+  "qemu": { "machineType": "virt,its=off" }
+}
+```
+
+Why: QEMU's `virt` machine enables the GICv3 ITS by default but ITS is not
+available under the Apple Virtualization framework (neither in the nested
+Tuor/Gondolin/QEMU VM nor in the parent Linux VM).
