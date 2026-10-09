@@ -31,6 +31,10 @@
   rather than whenever Nix mode is on.
 
 
+## Internal
+- Switch from npm to pnpm for development purposes
+
+
 # 0.5.1 (2026-08-03)
 
 ## Bug fixes
