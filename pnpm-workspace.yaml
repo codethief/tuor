@@ -1,3 +1,11 @@
 allowBuilds:
   cpu-features: true
   ssh2: true
+
+audit:
+  ignore:
+    # https://github.com/advisories/GHSA-86w9-cpqp-85rv
+    # https://github.com/digitalbazaar/forge/issues/1149
+    # Currently no fix available.
+    - GHSA-86w9-cpqp-85rv
+  ignorePrune: true
