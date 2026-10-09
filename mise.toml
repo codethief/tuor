@@ -1,5 +1,6 @@
 [tools]
 node = "24"
+pnpm = "12"
 
 [settings]
 lockfile = true
