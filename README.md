@@ -23,7 +23,7 @@ with Gondolin, please see [Differences to bare Gondolin](./docs/Differences.md).
   (will be deleted upon VM shutdown).
 
 - **Full control over the guest file system & environment**: Customize the
-  rootfs by providing an OCI container image (WIP) and/or by mounting host
+  rootfs by providing an OCI container image and/or by mounting host
   directories (read-only or read/write) and volumes while hiding select files
   from the guest. Choose which environment variables should be available inside
   the guest.

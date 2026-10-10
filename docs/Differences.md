@@ -11,8 +11,12 @@ defaults and fine-tune your config for each project. See
 
 
 ## Other features
+- **Dockerfile support for custom VM image**: Instead of providing an existing
+  OCI image to build the VM image from, have Tuor build the OCI image from an
+  existing Dockerfile/Containerfile.
+
 - **Volumes**: Instead of mounting an existing host directory like your
-  workspace, mount a "volume" – similarly to a Docker volume, this is a
+  workspace, mount a "volume", which – similarly to a Docker volume – is a
   host-backed guest directory managed by Tuor. Useful for persisting guest
   directories across VM restarts. (E.g. persist the home dir and thereby shell
   history, agent conversations, …)
