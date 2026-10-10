@@ -1,5 +1,8 @@
 # Unreleased
 
+
+# 0.7.0 (2026-10-10)
+
 ## Breaking changes
 - Config: Replaced `resources.rootfsSize` with a new `rootfs.size` setting (see
   below) and added stricter up-front validation. The old field (theoretically)
