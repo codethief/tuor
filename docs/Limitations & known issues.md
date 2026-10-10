@@ -6,6 +6,20 @@ reason, the user (and his home dir) are currently hard-coded at the Tuor config
 level, though you could of course `su` to a non-root user inside the VM.
 
 
+## VM might hang during boot when using custom images and memory is set to exactly 2 GiB
+This is an [upstream issue in
+QEMU](https://gitlab.com/qemu-project/qemu/-/work_items/3454). Whether or not
+you will actually run into this bug depends on the size of the VM's initramfs
+(mod 4096) that Gondolin produces, which [is a bit of a
+gamble](https://github.com/earendil-works/gondolin/issues/166). If you do, as a
+workaround set your VM's memory to a value slightly different from 2 GiB.
+
+
+## The initramfs of custom images is unusually big (~ 50 MiB) and much bigger than the default image's one
+See the note at the end of the aforementioned
+https://github.com/earendil-works/gondolin/issues/166 .
+
+
 ## Mounts & volumes don't support creating Unix file sockets
 This is a limitation in Gondolin's `sandboxfs` FUSE, which does not support the
 `MKNOD` syscall. 
